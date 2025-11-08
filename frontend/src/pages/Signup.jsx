@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { UserPlus } from 'lucide-react';
+import api from '../services/api';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -12,7 +12,6 @@ const Signup = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signup } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -25,8 +24,14 @@ const Signup = () => {
     setLoading(true);
 
     try {
-      await signup(formData);
-      navigate('/dashboard');
+      const response = await api.post('/auth/signup', formData);
+      
+      if (response.data.success && response.data.data.requiresVerification) {
+        // Redirect to OTP verification page
+        navigate('/verify-otp', { 
+          state: { email: response.data.data.email } 
+        });
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Signup failed. Please try again.');
     } finally {

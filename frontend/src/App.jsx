@@ -5,6 +5,7 @@ import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute';
 // Pages
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import VerifyOTP from './pages/VerifyOTP';
 import RoleBasedDashboard from './components/RoleBasedDashboard';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
@@ -41,6 +42,10 @@ function App() {
                 <Signup />
               </PublicRoute>
             }
+          />
+          <Route
+            path="/verify-otp"
+            element={<VerifyOTP />}
           />
 
           {/* Protected Routes */}

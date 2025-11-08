@@ -7,6 +7,7 @@ const Expense = require('./Expense');
 const Timesheet = require('./Timesheet');
 const CustomerInvoice = require('./CustomerInvoice');
 const VendorBill = require('./VendorBill');
+const OTP = require('./OTP');
 
 // Define Associations
 
@@ -75,5 +76,6 @@ module.exports = {
   Expense,
   Timesheet,
   CustomerInvoice,
-  VendorBill
+  VendorBill,
+  OTP
 };
