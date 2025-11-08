@@ -280,7 +280,7 @@ const Analytics = () => {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, value }) => `${name}: ${value}h`}
+                          label={false}
                           outerRadius={100}
                           fill="#8884d8"
                           dataKey="value"
@@ -290,6 +290,11 @@ const Analytics = () => {
                           ))}
                         </Pie>
                         <Tooltip content={<PieTooltip />} />
+                        <Legend
+                          verticalAlign="bottom"
+                          height={36}
+                          formatter={(value, entry) => `${value}: ${entry.payload.value}h`}
+                        />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -332,7 +337,7 @@ const Analytics = () => {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, value }) => `${name}: ${value}`}
+                          label={false}
                           outerRadius={100}
                           fill="#8884d8"
                           dataKey="value"
