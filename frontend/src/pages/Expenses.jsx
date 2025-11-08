@@ -1,25 +1,31 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, FileText } from 'lucide-react';
-import { financeService } from '../services';
+import { Search, Plus, FileText, CheckCircle, XCircle } from 'lucide-react';
+import { financeService, projectService, authService } from '../services';
 import { Link } from 'react-router-dom';
 import RoleBasedLayout from '../components/RoleBasedLayout';
 
 const Expenses = () => {
   const [expenses, setExpenses] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
+  const [selectedStatus, setSelectedStatus] = useState('All');
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const currentUser = authService.getCurrentUser();
+  const isAdmin = currentUser?.role === 'Admin';
   const [newExpense, setNewExpense] = useState({
     category: '',
     amount: '',
-    date: new Date().toISOString().split('T')[0],
+    expenseDate: new Date().toISOString().split('T')[0],
     description: '',
-    project: ''
+    projectId: '',
+    billable: false
   });
 
   useEffect(() => {
     fetchExpenses();
+    fetchActiveProjects();
   }, []);
 
   const fetchExpenses = async () => {
@@ -33,6 +39,18 @@ const Expenses = () => {
       setExpenses([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchActiveProjects = async () => {
+    try {
+      const response = await projectService.getAll();
+      // Filter only active projects
+      const activeProjects = (response.data || []).filter(p => p.status === 'Active');
+      setProjects(activeProjects);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      setProjects([]);
     }
   };
 
@@ -50,31 +68,67 @@ const Expenses = () => {
     const matchesSearch = 
       expense.expenseNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       expense.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      expense.employee?.toLowerCase().includes(searchTerm.toLowerCase());
+      expense.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      expense.creator?.name?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesCategory = selectedCategory === 'All Categories' || expense.category === selectedCategory;
+    const matchesStatus = selectedStatus === 'All' || expense.status === selectedStatus;
     
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && matchesStatus;
   });
 
   const handleSubmitExpense = async () => {
     try {
-      // This would call the expense service to create a new expense
-      console.log('Submitting expense:', newExpense);
-      await financeService.createExpense(newExpense);
+      if (!newExpense.category || !newExpense.amount || !newExpense.projectId) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      await financeService.createExpense({
+        category: newExpense.category,
+        amount: parseFloat(newExpense.amount),
+        expenseDate: newExpense.expenseDate,
+        description: newExpense.description,
+        projectId: newExpense.projectId,
+        billable: newExpense.billable
+      });
+
       setShowSubmitModal(false);
       setNewExpense({
         category: '',
         amount: '',
-        date: new Date().toISOString().split('T')[0],
+        expenseDate: new Date().toISOString().split('T')[0],
         description: '',
-        project: ''
+        projectId: '',
+        billable: false
       });
       fetchExpenses();
-      alert('Expense submitted successfully!');
+      alert('Expense submitted successfully! Waiting for admin approval.');
     } catch (error) {
       console.error('Failed to submit expense:', error);
       alert('Failed to submit expense. Please try again.');
+    }
+  };
+
+  const handleApproveExpense = async (expenseId) => {
+    try {
+      await financeService.approveExpense(expenseId, 'Approved');
+      fetchExpenses();
+      alert('Expense approved successfully');
+    } catch (error) {
+      console.error('Failed to approve expense:', error);
+      alert('Failed to approve expense');
+    }
+  };
+
+  const handleRejectExpense = async (expenseId) => {
+    try {
+      await financeService.approveExpense(expenseId, 'Rejected');
+      fetchExpenses();
+      alert('Expense rejected');
+    } catch (error) {
+      console.error('Failed to reject expense:', error);
+      alert('Failed to reject expense');
     }
   };
 
@@ -182,6 +236,17 @@ const Expenses = () => {
                 <option>Marketing</option>
                 <option>Other</option>
               </select>
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option>All</option>
+                <option>Pending</option>
+                <option>Approved</option>
+                <option>Rejected</option>
+                <option>Reimbursed</option>
+              </select>
             </div>
           </div>
         </div>
@@ -197,16 +262,16 @@ const Expenses = () => {
                   Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Project
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Category
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Employee
+                  Submitted By
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Amount
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Billable
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -232,25 +297,25 @@ const Expenses = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {expense.expenseDate ? new Date(expense.expenseDate).toLocaleDateString('en-US', { 
                         year: 'numeric', 
-                        month: '2-digit', 
-                        day: '2-digit' 
+                        month: 'short', 
+                        day: 'numeric' 
                       }) : new Date(expense.createdAt).toLocaleDateString('en-US', { 
                         year: 'numeric', 
-                        month: '2-digit', 
-                        day: '2-digit' 
+                        month: 'short', 
+                        day: 'numeric' 
                       })}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {expense.project?.name || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {expense.category}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {expense.employee}
+                      {expense.creator?.name || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
                       ${parseFloat(expense.amount).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getBillableBadge(expense.billable)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(expense.status)}`}>
@@ -258,9 +323,28 @@ const Expenses = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <button className="text-gray-400 hover:text-gray-600">
-                        <FileText size={18} />
-                      </button>
+                      {isAdmin && expense.status === 'Pending' ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleApproveExpense(expense.id)}
+                            className="text-green-600 hover:text-green-800 transition-colors"
+                            title="Approve"
+                          >
+                            <CheckCircle size={20} />
+                          </button>
+                          <button
+                            onClick={() => handleRejectExpense(expense.id)}
+                            className="text-red-600 hover:text-red-800 transition-colors"
+                            title="Reject"
+                          >
+                            <XCircle size={20} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button className="text-gray-400 hover:text-gray-600">
+                          <FileText size={18} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -293,6 +377,7 @@ const Expenses = () => {
                   <option value="Software">Software</option>
                   <option value="Marketing">Marketing</option>
                   <option value="Equipment">Equipment</option>
+                  <option value="Salary">Salary</option>
                   <option value="Other">Other</option>
                 </select>
               </div>
@@ -303,12 +388,11 @@ const Expenses = () => {
                 </label>
                 <input
                   type="number"
-                  step="0.01"
-                  min="0"
+                  placeholder="Enter amount"
                   value={newExpense.amount}
                   onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
-                  placeholder="Enter amount"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  step="0.01"
                 />
               </div>
 
@@ -318,23 +402,29 @@ const Expenses = () => {
                 </label>
                 <input
                   type="date"
-                  value={newExpense.date}
-                  onChange={(e) => setNewExpense({...newExpense, date: e.target.value})}
+                  value={newExpense.expenseDate}
+                  onChange={(e) => setNewExpense({...newExpense, expenseDate: e.target.value})}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Project
+                  Project *
                 </label>
-                <input
-                  type="text"
-                  value={newExpense.project}
-                  onChange={(e) => setNewExpense({...newExpense, project: e.target.value})}
-                  placeholder="Enter project name"
+                <select
+                  value={newExpense.projectId}
+                  onChange={(e) => setNewExpense({...newExpense, projectId: e.target.value})}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                >
+                  <option value="">Select Project</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Only active projects are shown</p>
               </div>
 
               <div>
@@ -342,38 +432,42 @@ const Expenses = () => {
                   Description
                 </label>
                 <textarea
+                  placeholder="Enter expense description"
                   value={newExpense.description}
                   onChange={(e) => setNewExpense({...newExpense, description: e.target.value})}
-                  placeholder="Enter expense description"
-                  rows={3}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows="3"
                 />
               </div>
 
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowSubmitModal(false);
-                    setNewExpense({
-                      category: '',
-                      amount: '',
-                      date: new Date().toISOString().split('T')[0],
-                      description: '',
-                      project: ''
-                    });
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSubmitExpense}
-                  disabled={!newExpense.category || !newExpense.amount || parseFloat(newExpense.amount) <= 0}
-                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                  Submit
-                </button>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="billable"
+                  checked={newExpense.billable}
+                  onChange={(e) => setNewExpense({...newExpense, billable: e.target.checked})}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="billable" className="ml-2 text-sm font-medium text-gray-700">
+                  Billable to client
+                </label>
               </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowSubmitModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitExpense}
+                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-300"
+                disabled={!newExpense.category || !newExpense.amount || !newExpense.projectId}
+              >
+                Submit
+              </button>
             </div>
           </div>
         </div>

@@ -216,6 +216,12 @@ export const financeService = {
     return response.data;
   },
 
+  // Expense approval (Admin only)
+  approveExpense: async (id, status) => {
+    const response = await api.put(`/finance/expenses/${id}/approval`, { status });
+    return response.data;
+  },
+
   // Invoices
   getInvoices: async (filters = {}) => {
     const response = await api.get('/finance/invoices', { params: filters });

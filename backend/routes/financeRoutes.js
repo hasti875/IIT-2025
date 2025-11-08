@@ -19,7 +19,8 @@ const {
   getExpenseById,
   createExpense,
   updateExpense,
-  deleteExpense
+  deleteExpense,
+  updateExpenseApproval
 } = require('../controllers/expenseController');
 const {
   getAllInvoices,
@@ -73,6 +74,11 @@ router
   .get(getExpenseById)
   .put(authorize('ProjectManager', 'Admin', 'Finance'), updateExpense)
   .delete(authorize('Admin', 'Finance'), deleteExpense);
+
+// Expense approval (Admin only)
+router
+  .route('/expenses/:id/approval')
+  .put(authorize('Admin'), updateExpenseApproval);
 
 // Customer Invoices Routes
 router

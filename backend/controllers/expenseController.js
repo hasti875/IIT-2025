@@ -1,5 +1,20 @@
 const { Expense, Project, User } = require('../models');
 
+// Helper function to generate unique expense number
+const generateExpenseNumber = async () => {
+  const lastExpense = await Expense.findOne({
+    order: [['createdAt', 'DESC']]
+  });
+
+  if (!lastExpense || !lastExpense.expenseNumber) {
+    return 'EXP-001';
+  }
+
+  const lastNumber = parseInt(lastExpense.expenseNumber.split('-')[1]);
+  const newNumber = lastNumber + 1;
+  return `EXP-${String(newNumber).padStart(3, '0')}`;
+};
+
 // @desc    Get all expenses
 // @route   GET /api/finance/expenses
 // @access  Private
@@ -92,7 +107,11 @@ exports.createExpense = async (req, res) => {
       });
     }
 
+    // Generate unique expense number
+    const expenseNumber = await generateExpenseNumber();
+
     const expense = await Expense.create({
+      expenseNumber,
       projectId,
       category,
       amount,
@@ -195,6 +214,53 @@ exports.deleteExpense = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error deleting expense',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Approve or reject expense
+// @route   PUT /api/finance/expenses/:id/approval
+// @access  Private (Admin only)
+exports.updateExpenseApproval = async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    if (!['Approved', 'Rejected'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status must be either Approved or Rejected'
+      });
+    }
+
+    const expense = await Expense.findByPk(req.params.id);
+
+    if (!expense) {
+      return res.status(404).json({
+        success: false,
+        message: 'Expense not found'
+      });
+    }
+
+    await expense.update({ status });
+
+    const updatedExpense = await Expense.findByPk(expense.id, {
+      include: [
+        { model: Project, as: 'project', attributes: ['id', 'name'] },
+        { model: User, as: 'creator', attributes: ['id', 'name', 'email'] }
+      ]
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Expense ${status.toLowerCase()} successfully`,
+      data: updatedExpense
+    });
+  } catch (error) {
+    console.error('Update expense approval error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating expense approval',
       error: error.message
     });
   }
