@@ -47,13 +47,22 @@ exports.getAllProjects = async (req, res) => {
     }
 
     // Calculate progress for each project
-    const projectsWithProgress = projects.map(project => {
+    const projectsWithProgress = await Promise.all(projects.map(async project => {
       const projectData = project.toJSON();
       const tasks = projectData.tasks || [];
       const totalTasks = tasks.length;
       const completedTasks = tasks.filter(t => t.status === 'Done').length;
       const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
       const teamMemberCount = projectData.teamMembers ? projectData.teamMembers.length : 0;
+      
+      // Auto-update project status if all tasks are completed
+      if (totalTasks > 0 && completedTasks === totalTasks && projectData.status !== 'Completed') {
+        await Project.update(
+          { status: 'Completed' },
+          { where: { id: projectData.id } }
+        );
+        projectData.status = 'Completed';
+      }
       
       return {
         ...projectData,
@@ -62,7 +71,7 @@ exports.getAllProjects = async (req, res) => {
         completedTaskCount: completedTasks,
         teamMemberCount
       };
-    });
+    }));
 
     res.status(200).json({
       success: true,

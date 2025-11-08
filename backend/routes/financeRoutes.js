@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const upload = require('../middleware/upload');
 const {
   getAllSalesOrders,
   getSalesOrderById,
@@ -20,7 +21,8 @@ const {
   createExpense,
   updateExpense,
   deleteExpense,
-  updateExpenseApproval
+  updateExpenseApproval,
+  generateExpenseReceipt
 } = require('../controllers/expenseController');
 const {
   getAllInvoices,
@@ -67,7 +69,7 @@ router
 router
   .route('/expenses')
   .get(getAllExpenses)
-  .post(createExpense);
+  .post(upload.single('receipt'), createExpense);
 
 router
   .route('/expenses/:id')
@@ -79,6 +81,11 @@ router
 router
   .route('/expenses/:id/approval')
   .put(authorize('Admin'), updateExpenseApproval);
+
+// Expense receipt generation
+router
+  .route('/expenses/:id/receipt')
+  .get(generateExpenseReceipt);
 
 // Customer Invoices Routes
 router

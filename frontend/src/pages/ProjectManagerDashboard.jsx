@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react';
-import { dashboardService, projectService } from '../services';
+import { dashboardService, projectService, taskService, timesheetService, financeService } from '../services';
 import { FolderKanban, CheckSquare, Clock, TrendingUp, Users, DollarSign, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ProjectManagerLayout from '../components/ProjectManagerLayout';
+import { useCurrency } from '../context/CurrencyContext';
 
 const ProjectManagerDashboard = () => {
+  const { formatAmount, currencySymbol } = useCurrency();
   const [analytics, setAnalytics] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [timesheets, setTimesheets] = useState([]);
+  const [salesOrders, setSalesOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -18,12 +23,18 @@ const ProjectManagerDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [analyticsRes, projectsRes] = await Promise.all([
-        dashboardService.getAnalytics(),
-        projectService.getAll()
+      const [analyticsRes, projectsRes, tasksRes, timesheetsRes, salesOrdersRes] = await Promise.all([
+        dashboardService.getAnalytics().catch(() => ({ data: null })),
+        projectService.getAll(),
+        taskService.getAll().catch(() => ({ data: [] })),
+        timesheetService.getTimesheets().catch(() => ({ data: [] })),
+        financeService.getSalesOrders().catch(() => ({ data: [] }))
       ]);
       setAnalytics(analyticsRes.data);
       setProjects(projectsRes.data || []);
+      setTasks(tasksRes.data || []);
+      setTimesheets(timesheetsRes.data || []);
+      setSalesOrders(salesOrdersRes.data || []);
     } catch (err) {
       setError('Failed to load dashboard data');
       console.error(err);
@@ -63,10 +74,43 @@ const ProjectManagerDashboard = () => {
     );
   }
 
+  // Calculate dynamic metrics
   const activeProjects = projects.filter(p => p.status === 'Active').length;
-  const totalTasks = 248; // This should come from actual task data
-  const totalHours = 1847; // This should come from timesheet data
-  const totalRevenue = projects.reduce((sum, p) => sum + parseFloat(p.budget || 0), 0);
+  const completedTasks = tasks.filter(t => t.status === 'Done').length;
+  
+  // Calculate total hours from timesheets (current month)
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  const totalHours = timesheets
+    .filter(ts => {
+      const tsDate = new Date(ts.date || ts.createdAt);
+      return tsDate.getMonth() === currentMonth && tsDate.getFullYear() === currentYear;
+    })
+    .reduce((sum, ts) => sum + parseFloat(ts.hours || 0), 0);
+  
+  // Calculate revenue from sales orders
+  const totalRevenue = salesOrders
+    .filter(so => so.status === 'Approved' || so.status === 'Completed')
+    .reduce((sum, so) => sum + parseFloat(so.totalAmount || 0), 0);
+  
+  // Calculate growth metrics
+  const lastMonthProjects = projects.filter(p => {
+    const createdDate = new Date(p.createdAt);
+    const lastMonth = new Date();
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+    return createdDate.getMonth() === lastMonth.getMonth() && 
+           createdDate.getFullYear() === lastMonth.getFullYear();
+  }).length;
+  
+  const lastWeekTasks = tasks.filter(t => {
+    if (t.status !== 'Done') return false;
+    const updatedDate = new Date(t.updatedAt);
+    const lastWeek = new Date();
+    lastWeek.setDate(lastWeek.getDate() - 7);
+    return updatedDate >= lastWeek;
+  }).length;
+  
+  const tasksGrowth = lastWeekTasks > 0 ? Math.round((lastWeekTasks / completedTasks) * 100) : 0;
 
   return (
     <ProjectManagerLayout>
@@ -89,7 +133,9 @@ const ProjectManagerDashboard = () => {
             </div>
             <p className="text-sm text-gray-500 mb-1">Active Projects</p>
             <p className="text-3xl font-bold text-gray-900">{activeProjects}</p>
-            <p className="text-xs text-green-600 mt-2">+2 this month</p>
+            <p className="text-xs text-green-600 mt-2">
+              {lastMonthProjects > 0 ? `+${lastMonthProjects} this month` : 'No new projects this month'}
+            </p>
           </div>
 
           {/* Tasks Completed */}
@@ -98,8 +144,10 @@ const ProjectManagerDashboard = () => {
               <CheckSquare className="text-green-600" size={24} />
             </div>
             <p className="text-sm text-gray-500 mb-1">Tasks Completed</p>
-            <p className="text-3xl font-bold text-gray-900">{totalTasks}</p>
-            <p className="text-xs text-green-600 mt-2">+18% from last week</p>
+            <p className="text-3xl font-bold text-gray-900">{completedTasks}</p>
+            <p className="text-xs text-green-600 mt-2">
+              {lastWeekTasks > 0 ? `+${lastWeekTasks} from last week` : 'Keep it up!'}
+            </p>
           </div>
 
           {/* Hours Logged */}
@@ -108,7 +156,7 @@ const ProjectManagerDashboard = () => {
               <Clock className="text-purple-600" size={24} />
             </div>
             <p className="text-sm text-gray-500 mb-1">Hours Logged</p>
-            <p className="text-3xl font-bold text-gray-900">{totalHours.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-gray-900">{Math.round(totalHours).toLocaleString()}</p>
             <p className="text-xs text-gray-500 mt-2">This month</p>
           </div>
 
@@ -119,9 +167,9 @@ const ProjectManagerDashboard = () => {
             </div>
             <p className="text-sm text-gray-500 mb-1">Revenue</p>
             <p className="text-3xl font-bold text-gray-900">
-              ${Math.round(totalRevenue).toLocaleString()}
+              {formatAmount(totalRevenue)}
             </p>
-            <p className="text-xs text-green-600 mt-2">+12% from last month</p>
+            <p className="text-xs text-gray-500 mt-2">From sales orders</p>
           </div>
         </div>
 
@@ -181,7 +229,7 @@ const ProjectManagerDashboard = () => {
                       </div>
                       <div className="flex items-center gap-1 text-gray-600">
                         <DollarSign size={16} />
-                        <span>${Math.round(spent)}k / ${Math.round(budget)}k</span>
+                        <span>{currencySymbol}{Math.round(spent)}k / {currencySymbol}{Math.round(budget)}k</span>
                       </div>
                     </div>
                     <span className="text-gray-500">

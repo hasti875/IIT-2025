@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Users, CreditCard, Bell, Shield } from 'lucide-react';
 import Layout from '../components/Layout';
+import { useCurrency } from '../context/CurrencyContext';
 
 const Settings = () => {
+  const { currency, currencies, updateCurrency } = useCurrency();
   const [activeTab, setActiveTab] = useState('general');
   const [companyInfo, setCompanyInfo] = useState({
     companyName: 'OneFlow Inc.',
     companyEmail: 'info@oneflow.com',
     phone: '+1 234 567 8900',
-    currency: 'USD ($)'
+    currency: currency
   });
   
   const [preferences, setPreferences] = useState({
@@ -67,9 +69,30 @@ const Settings = () => {
   };
 
   const handleSaveChanges = () => {
-    // Save logic here
+    // Update currency in context
+    updateCurrency(companyInfo.currency);
+    
+    // Save other company info to localStorage or backend
+    localStorage.setItem('companyInfo', JSON.stringify({
+      companyName: companyInfo.companyName,
+      companyEmail: companyInfo.companyEmail,
+      phone: companyInfo.phone
+    }));
+    
+    alert('Settings saved successfully!');
     console.log('Saving changes...', companyInfo, preferences);
   };
+
+  // Load saved company info on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('companyInfo');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      setCompanyInfo(prev => ({ ...prev, ...parsed, currency }));
+    } else {
+      setCompanyInfo(prev => ({ ...prev, currency }));
+    }
+  }, [currency]);
 
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon },
@@ -168,11 +191,15 @@ const Settings = () => {
                           onChange={(e) => handleCompanyInfoChange('currency', e.target.value)}
                           className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
-                          <option value="USD ($)">USD ($)</option>
-                          <option value="EUR (€)">EUR (€)</option>
-                          <option value="GBP (£)">GBP (£)</option>
-                          <option value="INR (₹)">INR (₹)</option>
+                          {Object.values(currencies).map((curr) => (
+                            <option key={curr.code} value={curr.code}>
+                              {curr.code} ({curr.symbol}) - {curr.name}
+                            </option>
+                          ))}
                         </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          This will update currency display across the entire application
+                        </p>
                       </div>
                     </div>
 

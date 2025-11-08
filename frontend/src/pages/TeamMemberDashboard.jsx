@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { taskService, projectService } from '../services';
+import { taskService, projectService, timesheetService } from '../services';
 import { CheckSquare, Clock, FolderKanban, TrendingUp, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import TeamMemberLayout from '../components/TeamMemberLayout';
@@ -7,6 +7,7 @@ import TeamMemberLayout from '../components/TeamMemberLayout';
 const TeamMemberDashboard = () => {
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [timesheets, setTimesheets] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -17,12 +18,14 @@ const TeamMemberDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [tasksResponse, projectsResponse] = await Promise.all([
+      const [tasksResponse, projectsResponse, timesheetsResponse] = await Promise.all([
         taskService.getAll(),
-        projectService.getAll()
+        projectService.getAll(),
+        timesheetService.getTimesheets().catch(() => ({ data: [] }))
       ]);
       setTasks(tasksResponse.data || []);
       setProjects(projectsResponse.data || []);
+      setTimesheets(timesheetsResponse.data || []);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
     } finally {
@@ -40,11 +43,25 @@ const TeamMemberDashboard = () => {
     );
   }
 
-  // Filter tasks assigned to current user (mock - you would filter by actual user ID)
-  const myTasks = tasks.slice(0, 6); // Show first 6 tasks as example
+  // Calculate metrics
+  const myTasks = tasks.slice(0, 6); // Show first 6 tasks
   const completedTasks = tasks.filter(t => t.status === 'Done').length;
   const inProgressTasks = tasks.filter(t => t.status === 'In Progress').length;
-  const assignedProjects = projects.slice(0, 4); // Show first 4 projects
+  const activeProjects = projects.filter(p => p.status === 'Active' || p.status === 'Planning');
+  const assignedProjects = activeProjects.slice(0, 4); // Show first 4 projects
+  
+  // Calculate hours this week from timesheets
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
+  startOfWeek.setHours(0, 0, 0, 0);
+  
+  const hoursThisWeek = timesheets
+    .filter(ts => {
+      const tsDate = new Date(ts.date || ts.createdAt);
+      return tsDate >= startOfWeek;
+    })
+    .reduce((sum, ts) => sum + parseFloat(ts.hours || 0), 0);
 
   return (
     <TeamMemberLayout>
@@ -86,7 +103,7 @@ const TeamMemberDashboard = () => {
                 <FolderKanban className="text-purple-600" size={20} />
               </div>
             </div>
-            <p className="text-2xl font-bold text-gray-900">{assignedProjects.length}</p>
+            <p className="text-2xl font-bold text-gray-900">{activeProjects.length}</p>
             <p className="text-xs text-gray-500 mt-1">Projects assigned</p>
           </div>
 
@@ -97,7 +114,7 @@ const TeamMemberDashboard = () => {
                 <Clock className="text-yellow-600" size={20} />
               </div>
             </div>
-            <p className="text-2xl font-bold text-gray-900">32</p>
+            <p className="text-2xl font-bold text-gray-900">{Math.round(hoursThisWeek)}</p>
             <p className="text-xs text-gray-500 mt-1">Logged hours</p>
           </div>
         </div>

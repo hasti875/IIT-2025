@@ -3,8 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { projectService, taskService, financeService, userService, authService } from '../services';
 import { ArrowLeft, Plus, Loader2, Edit, DollarSign, Calendar, Users, FileText, ShoppingCart, Receipt, CreditCard, TrendingUp, X, Clock, Send, MessageCircle, Paperclip } from 'lucide-react';
 import RoleBasedLayout from '../components/RoleBasedLayout';
+import { useCurrency } from '../context/CurrencyContext';
 
 const ProjectDetail = () => {
+  const { formatAmount, currencySymbol } = useCurrency();
   const { id } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
@@ -419,7 +421,7 @@ const ProjectDetail = () => {
               </div>
             </div>
             <p className="text-xl font-bold text-gray-900">
-              ${spentBudget.toLocaleString(undefined, { maximumFractionDigits: 1 })}k / ${((project.budget || 0) / 1000).toFixed(0)}k
+              {currencySymbol}{spentBudget.toLocaleString(undefined, { maximumFractionDigits: 1 })}k / {currencySymbol}{((project.budget || 0) / 1000).toFixed(0)}k
             </p>
           </div>
 
@@ -431,7 +433,7 @@ const ProjectDetail = () => {
               </div>
             </div>
             <p className="text-xl font-bold text-gray-900">
-              ${profit.toLocaleString(undefined, { maximumFractionDigits: 1 })}k
+              {currencySymbol}{profit.toLocaleString(undefined, { maximumFractionDigits: 1 })}k
             </p>
           </div>
 
@@ -492,7 +494,7 @@ const ProjectDetail = () => {
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-700 mb-2">Budget</h3>
-                      <p className="text-gray-900">${project.budget?.toLocaleString() || '0'}</p>
+                      <p className="text-gray-900">{formatAmount(project.budget || 0)}</p>
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-700 mb-2">Status</h3>
@@ -837,13 +839,13 @@ const ProjectDetail = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Unassigned</option>
-                    {users.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.name} - {user.role === 'TeamMember' ? 'Team Member' : user.role === 'ProjectManager' ? 'Project Manager' : user.role}
+                    {teamMembers.map(member => (
+                      <option key={member.user?.id || member.id} value={member.user?.id || member.id}>
+                        {member.user?.name || member.name} - {member.user?.role === 'TeamMember' ? 'Team Member' : member.user?.role === 'ProjectManager' ? 'Project Manager' : member.user?.role || member.role}
                       </option>
                     ))}
                   </select>
-                  {users.length === 0 && (
+                  {teamMembers.length === 0 && (
                     <p className="text-xs text-gray-500 mt-1">No team members available</p>
                   )}
                 </div>

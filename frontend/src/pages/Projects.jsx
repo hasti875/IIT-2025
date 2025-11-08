@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { projectService } from '../services';
+import { projectService, authService } from '../services';
 import { Search, Loader2, FolderKanban, Users, DollarSign, Calendar } from 'lucide-react';
 import RoleBasedLayout from '../components/RoleBasedLayout';
 import CreateProjectModal from '../components/CreateProjectModal';
+import { useCurrency } from '../context/CurrencyContext';
 
 const Projects = () => {
+  const { currencySymbol } = useCurrency();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Projects');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const currentUser = authService.getCurrentUser();
+  const canCreateProject = currentUser?.role !== 'TeamMember';
 
   useEffect(() => {
     fetchProjects();
@@ -92,12 +96,14 @@ const Projects = () => {
             <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
             <p className="text-sm text-gray-500 mt-1">Manage and track all your projects</p>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn btn-primary flex items-center gap-2"
-          >
-            + New Project
-          </button>
+          {canCreateProject && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn btn-primary flex items-center gap-2"
+            >
+              + New Project
+            </button>
+          )}
         </div>
 
         {/* Search Bar */}
@@ -204,7 +210,7 @@ const Projects = () => {
                     </div>
                     <div className="text-center">
                       <DollarSign size={16} className="mx-auto text-gray-400 mb-1" />
-                      <p className="text-xs font-medium text-gray-900">${((project.budget || 0) / 1000).toFixed(0)}k</p>
+                      <p className="text-xs font-medium text-gray-900">{currencySymbol}{((project.budget || 0) / 1000).toFixed(0)}k</p>
                       <p className="text-xs text-gray-500">Budget</p>
                     </div>
                   </div>
@@ -215,7 +221,7 @@ const Projects = () => {
         )}
       </div>
 
-      {showCreateModal && (
+      {canCreateProject && showCreateModal && (
         <CreateProjectModal
           onClose={() => setShowCreateModal(false)}
           onSuccess={() => {

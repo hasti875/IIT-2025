@@ -202,7 +202,13 @@ export const financeService = {
   },
 
   createExpense: async (data) => {
-    const response = await api.post('/finance/expenses', data);
+    // If data is FormData, let axios set the Content-Type header automatically
+    const config = data instanceof FormData ? {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    } : {};
+    const response = await api.post('/finance/expenses', data, config);
     return response.data;
   },
 
@@ -219,6 +225,14 @@ export const financeService = {
   // Expense approval (Admin only)
   approveExpense: async (id, status) => {
     const response = await api.put(`/finance/expenses/${id}/approval`, { status });
+    return response.data;
+  },
+
+  // Download expense receipt
+  downloadExpenseReceipt: async (id) => {
+    const response = await api.get(`/finance/expenses/${id}/receipt`, {
+      responseType: 'blob'
+    });
     return response.data;
   },
 

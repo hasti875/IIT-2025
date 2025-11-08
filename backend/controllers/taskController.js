@@ -1,5 +1,32 @@
 const { Task, User, Project } = require('../models');
 
+// Helper function to check and update project status based on tasks
+const updateProjectStatus = async (projectId) => {
+  try {
+    const tasks = await Task.findAll({
+      where: { projectId },
+      attributes: ['id', 'status']
+    });
+
+    if (tasks.length === 0) {
+      return; // No tasks, don't change project status
+    }
+
+    const allTasksDone = tasks.every(task => task.status === 'Done');
+    
+    if (allTasksDone) {
+      await Project.update(
+        { status: 'Completed' },
+        { where: { id: projectId } }
+      );
+      console.log(`Project ${projectId} status updated to Completed - all tasks done`);
+    }
+  } catch (error) {
+    console.error('Error updating project status:', error);
+    // Don't throw error, just log it so task update still succeeds
+  }
+};
+
 // @desc    Get all tasks
 // @route   GET /api/tasks
 // @access  Private
@@ -159,6 +186,9 @@ exports.updateTask = async (req, res) => {
       dueDate: dueDate !== undefined ? dueDate : task.dueDate
     });
 
+    // Check if all tasks are completed and update project status if needed
+    await updateProjectStatus(task.projectId);
+
     const updatedTask = await Task.findByPk(task.id, {
       include: [
         { model: User, as: 'assignee', attributes: ['id', 'name', 'email'] },
@@ -195,7 +225,11 @@ exports.deleteTask = async (req, res) => {
       });
     }
 
+    const projectId = task.projectId;
     await task.destroy();
+
+    // Check if all remaining tasks are completed and update project status if needed
+    await updateProjectStatus(projectId);
 
     res.status(200).json({
       success: true,

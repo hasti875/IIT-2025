@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, FileText, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Plus, FileText, CheckCircle, XCircle, Download, Image } from 'lucide-react';
 import { financeService, projectService, authService } from '../services';
 import { Link } from 'react-router-dom';
 import RoleBasedLayout from '../components/RoleBasedLayout';
+import { useCurrency } from '../context/CurrencyContext';
 
 const Expenses = () => {
+  const { formatAmount } = useCurrency();
   const [expenses, setExpenses] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,6 +14,8 @@ const Expenses = () => {
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
   const currentUser = authService.getCurrentUser();
   const isAdmin = currentUser?.role === 'Admin';
   const [newExpense, setNewExpense] = useState({
@@ -22,6 +26,7 @@ const Expenses = () => {
     projectId: '',
     billable: false
   });
+  const [receiptFile, setReceiptFile] = useState(null);
 
   useEffect(() => {
     fetchExpenses();
@@ -60,7 +65,7 @@ const Expenses = () => {
     .filter(exp => exp.billable)
     .reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
   const pendingApproval = expenses
-    .filter(exp => exp.status === 'pending')
+    .filter(exp => exp.status?.toLowerCase() === 'pending')
     .reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
 
   // Filter expenses
@@ -84,14 +89,21 @@ const Expenses = () => {
         return;
       }
 
-      await financeService.createExpense({
-        category: newExpense.category,
-        amount: parseFloat(newExpense.amount),
-        expenseDate: newExpense.expenseDate,
-        description: newExpense.description,
-        projectId: newExpense.projectId,
-        billable: newExpense.billable
-      });
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('category', newExpense.category);
+      formData.append('amount', parseFloat(newExpense.amount));
+      formData.append('expenseDate', newExpense.expenseDate);
+      formData.append('description', newExpense.description);
+      formData.append('projectId', newExpense.projectId);
+      formData.append('billable', newExpense.billable);
+      
+      // Append file if selected
+      if (receiptFile) {
+        formData.append('receipt', receiptFile);
+      }
+
+      await financeService.createExpense(formData);
 
       setShowSubmitModal(false);
       setNewExpense({
@@ -102,6 +114,7 @@ const Expenses = () => {
         projectId: '',
         billable: false
       });
+      setReceiptFile(null);
       fetchExpenses();
       alert('Expense submitted successfully! Waiting for admin approval.');
     } catch (error) {
@@ -129,6 +142,36 @@ const Expenses = () => {
     } catch (error) {
       console.error('Failed to reject expense:', error);
       alert('Failed to reject expense');
+    }
+  };
+
+  const handleDownloadReceipt = async (expenseId, expenseNumber) => {
+    try {
+      const blob = await financeService.downloadExpenseReceipt(expenseId);
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `expense-receipt-${expenseNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to download receipt:', error);
+      alert('Failed to download receipt. Please try again.');
+    }
+  };
+
+  const handleViewReceipt = (receiptPath) => {
+    if (receiptPath) {
+      // Construct full URL for the receipt
+      const baseURL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+      setSelectedReceipt(`${baseURL}${receiptPath}`);
+      setShowReceiptModal(true);
     }
   };
 
@@ -187,21 +230,21 @@ const Expenses = () => {
         <div className="bg-white rounded-xl border border-gray-100 p-6">
           <p className="text-sm text-gray-500 mb-2">Total Expenses</p>
           <p className="text-3xl font-bold text-gray-900">
-            ${totalExpenses.toLocaleString()}
+            {formatAmount(totalExpenses)}
           </p>
         </div>
         
         <div className="bg-white rounded-xl border border-gray-100 p-6">
           <p className="text-sm text-gray-500 mb-2">Billable</p>
           <p className="text-3xl font-bold text-green-600">
-            ${billableExpenses.toLocaleString()}
+            {formatAmount(billableExpenses)}
           </p>
         </div>
         
         <div className="bg-white rounded-xl border border-gray-100 p-6">
           <p className="text-sm text-gray-500 mb-2">Pending Approval</p>
           <p className="text-3xl font-bold text-orange-600">
-            ${pendingApproval.toLocaleString()}
+            {formatAmount(pendingApproval)}
           </p>
         </div>
       </div>
@@ -274,6 +317,9 @@ const Expenses = () => {
                   Amount
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Receipt
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -284,7 +330,7 @@ const Expenses = () => {
             <tbody className="bg-white divide-y divide-gray-100">
               {filteredExpenses.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan="9" className="px-6 py-8 text-center text-gray-500">
                     No expenses found
                   </td>
                 </tr>
@@ -315,7 +361,21 @@ const Expenses = () => {
                       {expense.creator?.name || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                      ${parseFloat(expense.amount).toLocaleString()}
+                      {formatAmount(expense.amount)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {expense.receipt ? (
+                        <button
+                          onClick={() => handleViewReceipt(expense.receipt)}
+                          className="text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1"
+                          title="View Receipt"
+                        >
+                          <Image size={18} />
+                          <span className="text-xs">View</span>
+                        </button>
+                      ) : (
+                        <span className="text-gray-400 text-xs">No receipt</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(expense.status)}`}>
@@ -323,28 +383,33 @@ const Expenses = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {isAdmin && expense.status === 'Pending' ? (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleApproveExpense(expense.id)}
-                            className="text-green-600 hover:text-green-800 transition-colors"
-                            title="Approve"
-                          >
-                            <CheckCircle size={20} />
-                          </button>
-                          <button
-                            onClick={() => handleRejectExpense(expense.id)}
-                            className="text-red-600 hover:text-red-800 transition-colors"
-                            title="Reject"
-                          >
-                            <XCircle size={20} />
-                          </button>
-                        </div>
-                      ) : (
-                        <button className="text-gray-400 hover:text-gray-600">
-                          <FileText size={18} />
+                      <div className="flex gap-2">
+                        {isAdmin && expense.status === 'Pending' ? (
+                          <>
+                            <button
+                              onClick={() => handleApproveExpense(expense.id)}
+                              className="text-green-600 hover:text-green-800 transition-colors"
+                              title="Approve"
+                            >
+                              <CheckCircle size={20} />
+                            </button>
+                            <button
+                              onClick={() => handleRejectExpense(expense.id)}
+                              className="text-red-600 hover:text-red-800 transition-colors"
+                              title="Reject"
+                            >
+                              <XCircle size={20} />
+                            </button>
+                          </>
+                        ) : null}
+                        <button
+                          onClick={() => handleDownloadReceipt(expense.id, expense.expenseNumber)}
+                          className="text-blue-600 hover:text-blue-800 transition-colors"
+                          title="Download Receipt"
+                        >
+                          <Download size={18} />
                         </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -357,11 +422,14 @@ const Expenses = () => {
 
       {/* Submit Expense Modal */}
       {showSubmitModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Submit Expense</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b">
+              <h2 className="text-xl font-bold text-gray-900">Submit Expense</h2>
+            </div>
             
-            <div className="space-y-4">
+            <div className="overflow-y-auto flex-1 p-6">
+              <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Category *
@@ -440,24 +508,50 @@ const Expenses = () => {
                 />
               </div>
 
-              <div className="flex items-center">
+              <div className="flex items-start">
                 <input
                   type="checkbox"
                   id="billable"
                   checked={newExpense.billable}
                   onChange={(e) => setNewExpense({...newExpense, billable: e.target.checked})}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-1"
                 />
-                <label htmlFor="billable" className="ml-2 text-sm font-medium text-gray-700">
-                  Billable to client
+                <div className="ml-2">
+                  <label htmlFor="billable" className="text-sm font-medium text-gray-700">
+                    Billable to client
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Check this if the expense should be charged to the client
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Receipt / Bill Photo
                 </label>
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setReceiptFile(e.target.files[0])}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                {receiptFile && (
+                  <p className="text-xs text-gray-600 mt-2">
+                    Selected: {receiptFile.name} ({(receiptFile.size / 1024 / 1024).toFixed(2)} MB)
+                  </p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Upload a photo or PDF of your receipt/bill (max 5MB)
+                </p>
+              </div>
               </div>
             </div>
 
-            <div className="flex gap-3 mt-6">
+            <div className="flex gap-3 p-6 border-t bg-gray-50">
               <button
                 onClick={() => setShowSubmitModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-colors"
               >
                 Cancel
               </button>
@@ -468,6 +562,43 @@ const Expenses = () => {
               >
                 Submit
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receipt Viewing Modal */}
+      {showReceiptModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto">
+            <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+              <h2 className="text-xl font-bold text-gray-900">Receipt / Bill</h2>
+              <button
+                onClick={() => {
+                  setShowReceiptModal(false);
+                  setSelectedReceipt(null);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+            <div className="p-4">
+              {selectedReceipt && (
+                selectedReceipt.endsWith('.pdf') ? (
+                  <iframe
+                    src={selectedReceipt}
+                    className="w-full h-[70vh] border rounded"
+                    title="Receipt PDF"
+                  />
+                ) : (
+                  <img
+                    src={selectedReceipt}
+                    alt="Receipt"
+                    className="w-full h-auto max-h-[70vh] object-contain"
+                  />
+                )
+              )}
             </div>
           </div>
         </div>

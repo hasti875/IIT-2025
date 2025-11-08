@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import RoleBasedLayout from '../components/RoleBasedLayout';
 import { Users as UsersIcon, Plus, Search, Edit2, Trash2, UserCheck, UserX } from 'lucide-react';
 import { userService } from '../services';
+import { useCurrency } from '../context/CurrencyContext';
 
 export default function Users() {
+  const { currencySymbol } = useCurrency();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -183,7 +185,7 @@ export default function Users() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${user.hourlyRate || '0'}/hr
+                      {currencySymbol}{user.hourlyRate || '0'}/hr
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
