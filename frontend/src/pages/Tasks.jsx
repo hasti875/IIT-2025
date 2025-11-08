@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { taskService } from '../services';
 import { Loader2, User } from 'lucide-react';
-import Layout from '../components/Layout';
+import RoleBasedLayout from '../components/RoleBasedLayout';
 
 const Tasks = () => {
   const [tasks, setTasks] = useState([]);
@@ -47,7 +47,7 @@ const Tasks = () => {
   };
 
   return (
-    <Layout>
+    <RoleBasedLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-start">
@@ -133,7 +133,7 @@ const Tasks = () => {
           </div>
         )}
       </div>
-    </Layout>
+    </RoleBasedLayout>
   );
 };
 

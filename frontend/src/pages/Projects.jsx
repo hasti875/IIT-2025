@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { projectService } from '../services';
 import { Search, Loader2, FolderKanban, Users, DollarSign, Calendar } from 'lucide-react';
-import Layout from '../components/Layout';
+import RoleBasedLayout from '../components/RoleBasedLayout';
 import CreateProjectModal from '../components/CreateProjectModal';
 
 const Projects = () => {
@@ -84,7 +84,7 @@ const Projects = () => {
   };
 
   return (
-    <Layout>
+    <RoleBasedLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-start">
@@ -221,7 +221,7 @@ const Projects = () => {
           }}
         />
       )}
-    </Layout>
+    </RoleBasedLayout>
   );
 };
 

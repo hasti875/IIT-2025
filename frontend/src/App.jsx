@@ -5,16 +5,20 @@ import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute';
 // Pages
 import Login from './pages/Login';
 import Signup from './pages/Signup';
-import Dashboard from './pages/Dashboard';
+import RoleBasedDashboard from './components/RoleBasedDashboard';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
 import Tasks from './pages/Tasks';
+import MyTasks from './pages/MyTasks';
 import Finance from './pages/Finance';
 import SalesOrders from './pages/SalesOrders';
 import PurchaseOrders from './pages/PurchaseOrders';
 import Invoices from './pages/Invoices';
 import Expenses from './pages/Expenses';
 import Timesheets from './pages/Timesheets';
+import Users from './pages/Users';
+import Analytics from './pages/Analytics';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -44,7 +48,7 @@ function App() {
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <Dashboard />
+                <RoleBasedDashboard />
               </ProtectedRoute>
             }
           />
@@ -69,6 +73,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Tasks />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-tasks"
+            element={
+              <ProtectedRoute>
+                <MyTasks />
               </ProtectedRoute>
             }
           />
@@ -117,6 +129,30 @@ function App() {
             element={
               <ProtectedRoute>
                 <Timesheets />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/users"
+            element={
+              <ProtectedRoute>
+                <Users />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <Analytics />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
               </ProtectedRoute>
             }
           />

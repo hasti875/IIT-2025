@@ -2,13 +2,21 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, FileText } from 'lucide-react';
 import { financeService } from '../services';
 import { Link } from 'react-router-dom';
-import Layout from '../components/Layout';
+import RoleBasedLayout from '../components/RoleBasedLayout';
 
 const Expenses = () => {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [newExpense, setNewExpense] = useState({
+    category: '',
+    amount: '',
+    date: new Date().toISOString().split('T')[0],
+    description: '',
+    project: ''
+  });
 
   useEffect(() => {
     fetchExpenses();
@@ -49,6 +57,27 @@ const Expenses = () => {
     return matchesSearch && matchesCategory;
   });
 
+  const handleSubmitExpense = async () => {
+    try {
+      // This would call the expense service to create a new expense
+      console.log('Submitting expense:', newExpense);
+      await financeService.createExpense(newExpense);
+      setShowSubmitModal(false);
+      setNewExpense({
+        category: '',
+        amount: '',
+        date: new Date().toISOString().split('T')[0],
+        description: '',
+        project: ''
+      });
+      fetchExpenses();
+      alert('Expense submitted successfully!');
+    } catch (error) {
+      console.error('Failed to submit expense:', error);
+      alert('Failed to submit expense. Please try again.');
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'approved':
@@ -73,16 +102,16 @@ const Expenses = () => {
 
   if (loading) {
     return (
-      <Layout>
+      <RoleBasedLayout>
         <div className="flex items-center justify-center h-64">
           <div className="text-gray-500">Loading expenses...</div>
         </div>
-      </Layout>
+      </RoleBasedLayout>
     );
   }
 
   return (
-    <Layout>
+    <RoleBasedLayout>
       <div className="p-8">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
@@ -90,7 +119,10 @@ const Expenses = () => {
           <h1 className="text-2xl font-bold text-gray-900">Expenses</h1>
           <p className="text-gray-500 mt-1">Track and manage project expenses</p>
         </div>
-        <button className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+        <button 
+          onClick={() => setShowSubmitModal(true)}
+          className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+        >
           <Plus size={20} />
           Submit Expense
         </button>
@@ -238,7 +270,115 @@ const Expenses = () => {
         </div>
       </div>
       </div>
-    </Layout>
+
+      {/* Submit Expense Modal */}
+      {showSubmitModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Submit Expense</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category *
+                </label>
+                <select
+                  value={newExpense.category}
+                  onChange={(e) => setNewExpense({...newExpense, category: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Category</option>
+                  <option value="Travel">Travel</option>
+                  <option value="Meals">Meals</option>
+                  <option value="Software">Software</option>
+                  <option value="Marketing">Marketing</option>
+                  <option value="Equipment">Equipment</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Amount *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={newExpense.amount}
+                  onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
+                  placeholder="Enter amount"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date *
+                </label>
+                <input
+                  type="date"
+                  value={newExpense.date}
+                  onChange={(e) => setNewExpense({...newExpense, date: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Project
+                </label>
+                <input
+                  type="text"
+                  value={newExpense.project}
+                  onChange={(e) => setNewExpense({...newExpense, project: e.target.value})}
+                  placeholder="Enter project name"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={newExpense.description}
+                  onChange={(e) => setNewExpense({...newExpense, description: e.target.value})}
+                  placeholder="Enter expense description"
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowSubmitModal(false);
+                    setNewExpense({
+                      category: '',
+                      amount: '',
+                      date: new Date().toISOString().split('T')[0],
+                      description: '',
+                      project: ''
+                    });
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitExpense}
+                  disabled={!newExpense.category || !newExpense.amount || parseFloat(newExpense.amount) <= 0}
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </RoleBasedLayout>
   );
 };
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Clock, Plus, Calendar } from 'lucide-react';
 import { timesheetService } from '../services';
-import Layout from '../components/Layout';
+import RoleBasedLayout from '../components/RoleBasedLayout';
 
 const Timesheets = () => {
   const [timesheets, setTimesheets] = useState([]);
@@ -65,16 +65,16 @@ const Timesheets = () => {
 
   if (loading) {
     return (
-      <Layout>
+      <RoleBasedLayout>
         <div className="flex items-center justify-center h-64">
           <div className="text-gray-500">Loading timesheets...</div>
         </div>
-      </Layout>
+      </RoleBasedLayout>
     );
   }
 
   return (
-    <Layout>
+    <RoleBasedLayout>
       <div className="p-8">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
@@ -243,7 +243,7 @@ const Timesheets = () => {
           </div>
         </div>
       </div>
-    </Layout>
+    </RoleBasedLayout>
   );
 };
 
