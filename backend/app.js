@@ -9,6 +9,7 @@ const taskRoutes = require('./routes/taskRoutes');
 const financeRoutes = require('./routes/financeRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const timesheetRoutes = require('./routes/timesheetRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 // Import error handler
 const errorHandler = require('./middleware/errorHandler');
@@ -45,6 +46,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/timesheets', timesheetRoutes);
+app.use('/api/users', userRoutes);
 
 // 404 handler
 app.use((req, res) => {

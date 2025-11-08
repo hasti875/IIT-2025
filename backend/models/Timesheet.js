@@ -9,12 +9,13 @@ const Timesheet = sequelize.define('Timesheet', {
   },
   userId: {
     type: DataTypes.UUID,
-    allowNull: true,
+    allowNull: false,
     field: 'user_id',
     references: {
       model: 'users',
       key: 'id'
-    }
+    },
+    onDelete: 'CASCADE'
   },
   taskId: {
     type: DataTypes.UUID,
