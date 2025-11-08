@@ -174,14 +174,3 @@ Oneflow/
 - **Responsive Design**: Mobile-first approach
 - **User Experience**: Intuitive navigation and feedback
 
-## 📝 License
-
-MIT License - feel free to use for your hackathon or projects!
-
-## 👥 Contributing
-
-This is a hackathon MVP. Contributions welcome!
-
----
-
-Built with ❤️ for the 24-hour hackathon challenge
