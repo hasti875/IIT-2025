@@ -3,14 +3,16 @@ const router = express.Router();
 const userController = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/auth');
 
-// All routes require authentication and Admin role
+// All routes require authentication
 router.use(protect);
-router.use(authorize('Admin'));
 
-router.get('/', userController.getAllUsers);
-router.get('/:id', userController.getUserById);
-router.post('/', userController.createUser);
-router.put('/:id', userController.updateUser);
-router.delete('/:id', userController.deleteUser);
+// GET routes - allow ProjectManager and Admin
+router.get('/', authorize('ProjectManager', 'Admin'), userController.getAllUsers);
+router.get('/:id', authorize('ProjectManager', 'Admin'), userController.getUserById);
+
+// Write operations - Admin only
+router.post('/', authorize('Admin'), userController.createUser);
+router.put('/:id', authorize('Admin'), userController.updateUser);
+router.delete('/:id', authorize('Admin'), userController.deleteUser);
 
 module.exports = router;

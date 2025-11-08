@@ -104,6 +104,15 @@ const MyTasks = () => {
                       <p className="text-sm text-gray-600 mb-3">{task.description}</p>
                     )}
                     
+                    {/* Project Name */}
+                    {task.project && (
+                      <div className="mb-2">
+                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
+                          📁 {task.project.name}
+                        </span>
+                      </div>
+                    )}
+                    
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                       <Calendar size={14} />
                       <span>{task.dueDate || 'No due date'}</span>

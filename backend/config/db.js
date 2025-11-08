@@ -24,11 +24,11 @@ const connectDB = async () => {
     await sequelize.authenticate();
     console.log('✅ PostgreSQL connected successfully');
     
-    // Sync models in development
-    if (process.env.NODE_ENV === 'development') {
-      await sequelize.sync({ alter: true });
-      console.log('✅ Database models synchronized');
-    }
+    // Sync models in development - temporarily disabled to fix schema issues
+    // if (process.env.NODE_ENV === 'development') {
+    //   await sequelize.sync({ alter: true });
+    //   console.log('✅ Database models synchronized');
+    // }
   } catch (error) {
     console.error('❌ Unable to connect to database:', error.message);
     process.exit(1);

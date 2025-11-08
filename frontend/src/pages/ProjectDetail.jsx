@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projectService, taskService, financeService, userService } from '../services';
-import { ArrowLeft, Plus, Loader2, Edit, DollarSign, Calendar, Users, FileText, ShoppingCart, Receipt, CreditCard, TrendingUp, X } from 'lucide-react';
+import { projectService, taskService, financeService, userService, authService } from '../services';
+import { ArrowLeft, Plus, Loader2, Edit, DollarSign, Calendar, Users, FileText, ShoppingCart, Receipt, CreditCard, TrendingUp, X, Clock, Send, MessageCircle, Paperclip } from 'lucide-react';
 import RoleBasedLayout from '../components/RoleBasedLayout';
 
 const ProjectDetail = () => {
@@ -10,14 +10,28 @@ const ProjectDetail = () => {
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [financialDocs, setFinancialDocs] = useState({
+    salesOrders: [],
+    purchaseOrders: [],
+    invoices: [],
+    expenses: []
+  });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [draggedTask, setDraggedTask] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const messagesEndRef = useRef(null);
+  const currentUser = authService.getCurrentUser();
   const [taskFormData, setTaskFormData] = useState({
     name: '',
     description: '',
-    status: 'To Do',
+    status: 'New',
     priority: 'Medium',
     assignedTo: '',
     dueDate: ''
@@ -26,7 +40,18 @@ const ProjectDetail = () => {
   useEffect(() => {
     fetchProjectData();
     fetchUsers();
+    fetchTeamMembers();
+    fetchFinancialDocs();
+    fetchMessages();
   }, [id]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  useEffect(() => {
+    console.log('Team members state updated:', teamMembers);
+  }, [teamMembers]);
 
   const fetchProjectData = async () => {
     try {
@@ -47,9 +72,159 @@ const ProjectDetail = () => {
   const fetchUsers = async () => {
     try {
       const response = await userService.getAllUsers();
-      setUsers(response.data || []);
+      // Filter to show only Team Members and Project Managers
+      const filteredUsers = (response.data || []).filter(user => 
+        user.role === 'TeamMember' || user.role === 'ProjectManager'
+      );
+      setUsers(filteredUsers);
     } catch (error) {
       console.error('Failed to fetch users:', error);
+    }
+  };
+
+  const fetchTeamMembers = async () => {
+    try {
+      const response = await projectService.getProjectTeam(id);
+      console.log('Full team response:', response);
+      console.log('response.data:', response.data);
+      console.log('response.data type:', Array.isArray(response.data));
+      setTeamMembers(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch team members:', error);
+      console.error('Error details:', error.response);
+    }
+  };
+
+  const fetchFinancialDocs = async () => {
+    try {
+      const [soRes, poRes, invRes, expRes] = await Promise.all([
+        financeService.getSalesOrders({ projectId: id }),
+        financeService.getPurchaseOrders({ projectId: id }),
+        financeService.getInvoices({ projectId: id }),
+        financeService.getExpenses({ projectId: id })
+      ]);
+      
+      setFinancialDocs({
+        salesOrders: soRes.data || [],
+        purchaseOrders: poRes.data || [],
+        invoices: invRes.data || [],
+        expenses: expRes.data || []
+      });
+    } catch (error) {
+      console.error('Failed to fetch financial documents:', error);
+    }
+  };
+
+  const fetchMessages = async () => {
+    try {
+      const response = await projectService.getMessages(id);
+      setMessages(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch messages:', error);
+    }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+
+    try {
+      setSendingMessage(true);
+      const response = await projectService.sendMessage(id, {
+        message: newMessage.trim()
+      });
+      setMessages([...messages, response.data]);
+      setNewMessage('');
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      alert('Failed to send message');
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId) => {
+    if (!window.confirm('Are you sure you want to delete this message?')) return;
+
+    try {
+      await projectService.deleteMessage(id, messageId);
+      setMessages(messages.filter(msg => msg.id !== messageId));
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      alert('Failed to delete message');
+    }
+  };
+
+  const handleAddTeamMember = async () => {
+    if (!selectedUserId) {
+      alert('Please select a team member');
+      return;
+    }
+
+    try {
+      await projectService.addTeamMember(id, selectedUserId);
+      setShowTeamModal(false);
+      setSelectedUserId('');
+      fetchTeamMembers(); // Refresh team members
+      alert('Team member added successfully!');
+    } catch (error) {
+      console.error('Failed to add team member:', error);
+      alert('Failed to add team member');
+    }
+  };
+
+  const handleRemoveTeamMember = async (userId) => {
+    if (window.confirm('Are you sure you want to remove this team member?')) {
+      try {
+        await projectService.removeTeamMember(id, userId);
+        fetchTeamMembers(); // Refresh team members
+      } catch (error) {
+        console.error('Failed to remove team member:', error);
+        alert('Failed to remove team member');
+      }
+    }
+  };
+
+  // Task drag and drop handlers
+  const handleTaskDragStart = (e, task) => {
+    setDraggedTask(task);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleTaskDragEnd = () => {
+    setDraggedTask(null);
+  };
+
+  const handleTaskDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleTaskDrop = async (e, newStatus) => {
+    e.preventDefault();
+    
+    if (!draggedTask || draggedTask.status === newStatus) {
+      return;
+    }
+
+    try {
+      await taskService.update(draggedTask.id, { status: newStatus });
+      
+      // Update local state and recalculate progress
+      setTasks(tasks.map(task => 
+        task.id === draggedTask.id 
+          ? { ...task, status: newStatus }
+          : task
+      ));
+      
+      setDraggedTask(null);
+    } catch (error) {
+      console.error('Failed to update task status:', error);
+      alert('Failed to update task status');
     }
   };
 
@@ -64,7 +239,7 @@ const ProjectDetail = () => {
       setTaskFormData({
         name: '',
         description: '',
-        status: 'To Do',
+        status: 'New',
         priority: 'Medium',
         assignedTo: '',
         dueDate: ''
@@ -81,6 +256,17 @@ const ProjectDetail = () => {
     if (!tasks || tasks.length === 0) return 0;
     const completedTasks = tasks.filter(task => task.status === 'Done').length;
     return Math.round((completedTasks / tasks.length) * 100);
+  };
+
+  // Get task status breakdown
+  const getTaskBreakdown = () => {
+    if (!tasks || tasks.length === 0) return { new: 0, inProgress: 0, blocked: 0, done: 0 };
+    return {
+      new: tasks.filter(t => t.status === 'New').length,
+      inProgress: tasks.filter(t => t.status === 'In Progress').length,
+      blocked: tasks.filter(t => t.status === 'Blocked').length,
+      done: tasks.filter(t => t.status === 'Done').length
+    };
   };
 
   // Format date
@@ -120,13 +306,14 @@ const ProjectDetail = () => {
   const progress = calculateProgress();
   const spentBudget = calculateSpent();
   const profit = (project.budget || 0) - spentBudget;
+  const taskBreakdown = getTaskBreakdown();
+  const totalTasks = tasks.length;
 
   const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'tasks', label: 'Tasks' },
-    { id: 'calendar', label: 'Calendar' },
-    { id: 'team', label: 'Team' },
-    { id: 'finances', label: 'Finances' }
+    { id: 'chat', label: 'Chat' },
+    { id: 'team', label: 'Team' }
   ];
 
   // Mock financial documents data
@@ -214,7 +401,13 @@ const ProjectDetail = () => {
             </div>
             <p className="text-2xl font-bold text-gray-900">{progress}%</p>
             <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${progress}%` }}></div>
+              <div className="bg-blue-500 h-2 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+            </div>
+            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+              <span>{taskBreakdown.done} / {totalTasks} tasks done</span>
+              {taskBreakdown.blocked > 0 && (
+                <span className="text-red-600 font-medium">{taskBreakdown.blocked} blocked</span>
+              )}
             </div>
           </div>
 
@@ -253,6 +446,7 @@ const ProjectDetail = () => {
           </div>
         </div>
 
+       
         {/* Tabs */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="border-b border-gray-200">
@@ -274,37 +468,6 @@ const ProjectDetail = () => {
           </div>
 
           <div className="p-6">
-            {/* Finances Tab Content */}
-            {activeTab === 'finances' && (
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 mb-6">Financial Documents</h2>
-                <div className="space-y-3">
-                  {financialDocuments.map((doc, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 ${doc.iconBg} rounded-lg flex items-center justify-center`}>
-                          <doc.icon className={doc.iconColor} size={24} />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{doc.type}</h3>
-                          <p className="text-sm text-gray-500">{doc.id}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <p className="text-lg font-semibold text-gray-900">{doc.amount}</p>
-                        <span className={`px-3 py-1 ${doc.statusColor} text-white rounded-md text-sm font-medium`}>
-                          {doc.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Overview Tab Content */}
             {activeTab === 'overview' && (
               <div>
@@ -357,24 +520,78 @@ const ProjectDetail = () => {
                     New Task
                   </button>
                 </div>
+                
                 {tasks && tasks.length > 0 ? (
-                  <div className="space-y-3">
-                    {tasks.map((task) => (
-                      <div key={task.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900">{task.name}</h3>
-                          <p className="text-sm text-gray-600 mt-1">{task.description || 'No description'}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {['New', 'In Progress', 'Blocked', 'Done'].map((status) => {
+                      const statusTasks = tasks.filter(t => t.status === status);
+                      const statusColors = {
+                        'New': { header: 'text-gray-700', bg: 'bg-gray-50', border: 'border-gray-300' },
+                        'In Progress': { header: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-300' },
+                        'Blocked': { header: 'text-red-600', bg: 'bg-red-50', border: 'border-red-300' },
+                        'Done': { header: 'text-green-600', bg: 'bg-green-50', border: 'border-green-300' }
+                      };
+                      
+                      return (
+                        <div key={status} className="flex flex-col">
+                          <div className="flex items-center justify-between mb-3">
+                            <h3 className={`font-semibold text-sm ${statusColors[status].header}`}>
+                              {status} ({statusTasks.length})
+                            </h3>
+                          </div>
+                          
+                          <div 
+                            className={`flex-1 min-h-[400px] rounded-lg p-3 border-2 ${statusColors[status].bg} ${statusColors[status].border} space-y-2`}
+                            onDragOver={handleTaskDragOver}
+                            onDrop={(e) => handleTaskDrop(e, status)}
+                          >
+                            {statusTasks.map((task) => (
+                              <div
+                                key={task.id}
+                                draggable="true"
+                                onDragStart={(e) => handleTaskDragStart(e, task)}
+                                onDragEnd={handleTaskDragEnd}
+                                className={`bg-white p-3 rounded-lg shadow-sm border hover:shadow-md transition-all cursor-move ${
+                                  draggedTask?.id === task.id ? 'opacity-50' : ''
+                                }`}
+                              >
+                                <h4 className="font-medium text-gray-900 text-sm mb-1">{task.name}</h4>
+                                {task.description && (
+                                  <p className="text-xs text-gray-600 mb-2 line-clamp-2">{task.description}</p>
+                                )}
+                                <div className="flex items-center justify-between">
+                                  {task.assignee && (
+                                    <div className="flex items-center gap-1">
+                                      <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                                        <span className="text-white text-xs font-medium">
+                                          {task.assignee.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {task.priority && (
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                      task.priority === 'Critical' ? 'bg-red-100 text-red-700' :
+                                      task.priority === 'High' ? 'bg-orange-100 text-orange-700' :
+                                      task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                                      'bg-gray-100 text-gray-700'
+                                    }`}>
+                                      {task.priority}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                            
+                            {statusTasks.length === 0 && (
+                              <div className="text-center text-gray-400 text-xs py-8">
+                                Drop tasks here
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          task.status === 'Done' ? 'bg-green-100 text-green-800' :
-                          task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                          task.status === 'To Do' ? 'bg-gray-100 text-gray-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {task.status}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-gray-600 text-center py-8">No tasks created yet. Click "New Task" to add one.</p>
@@ -382,12 +599,106 @@ const ProjectDetail = () => {
               </div>
             )}
 
-            {/* Calendar Tab Content */}
-            {activeTab === 'calendar' && (
-              <div className="text-center py-12">
-                <Calendar className="mx-auto text-gray-400 mb-4" size={48} />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Calendar View</h3>
-                <p className="text-gray-600">Calendar integration coming soon</p>
+            {/* Chat Tab Content */}
+            {activeTab === 'chat' && (
+              <div className="flex flex-col h-[600px]">
+                <div className="mb-4">
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <MessageCircle size={24} />
+                    Project Chat — {project?.name}
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">{teamMembers.length} team members online</p>
+                </div>
+
+                {/* Messages Container */}
+                <div className="flex-1 bg-gray-50 rounded-lg p-4 overflow-y-auto mb-4 border border-gray-200">
+                  {messages.length === 0 ? (
+                    <div className="text-center py-12">
+                      <MessageCircle className="mx-auto text-gray-400 mb-3" size={48} />
+                      <p className="text-gray-600">No messages yet. Start the conversation!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {messages.map((msg) => {
+                        const isOwnMessage = msg.userId === currentUser?.id;
+                        const messageTime = new Date(msg.createdAt).toLocaleTimeString('en-US', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        });
+                        const messageDate = new Date(msg.createdAt).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric' 
+                        });
+
+                        return (
+                          <div
+                            key={msg.id}
+                            className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div className={`max-w-[70%] ${isOwnMessage ? 'order-2' : 'order-1'}`}>
+                              {!isOwnMessage && (
+                                <div className="flex items-center gap-2 mb-1">
+                                  <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-semibold">
+                                    {msg.user?.name?.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="text-xs font-medium text-gray-700">{msg.user?.name}</span>
+                                  <span className="text-xs text-gray-400">{messageTime}</span>
+                                </div>
+                              )}
+                              <div
+                                className={`rounded-lg p-3 ${
+                                  isOwnMessage
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-white border border-gray-200 text-gray-900'
+                                }`}
+                              >
+                                <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
+                                {isOwnMessage && (
+                                  <div className="flex items-center justify-end gap-2 mt-1">
+                                    <span className="text-xs opacity-75">{messageTime}</span>
+                                    <button
+                                      onClick={() => handleDeleteMessage(msg.id)}
+                                      className="text-xs opacity-75 hover:opacity-100 underline"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Message Input */}
+                <form onSubmit={handleSendMessage} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={sendingMessage}
+                  />
+                  <button
+                    type="submit"
+                    disabled={sendingMessage || !newMessage.trim()}
+                    className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {sendingMessage ? (
+                      <Loader2 className="animate-spin" size={20} />
+                    ) : (
+                      <>
+                        <Send size={20} />
+                        Send
+                      </>
+                    )}
+                  </button>
+                </form>
               </div>
             )}
 
@@ -404,11 +715,49 @@ const ProjectDetail = () => {
                     Add Member
                   </button>
                 </div>
-                <div className="text-center py-12">
-                  <Users className="mx-auto text-gray-400 mb-4" size={48} />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Team Management</h3>
-                  <p className="text-gray-600">Team member assignment coming soon</p>
-                </div>
+                
+                {teamMembers.length > 0 ? (
+                  <div className="space-y-3">
+                    {teamMembers.map((member) => (
+                      <div
+                        key={member.id}
+                        className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Users className="text-blue-600" size={20} />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900">{member.name}</h3>
+                            <p className="text-sm text-gray-500">{member.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            member.role === 'ProjectManager' ? 'bg-green-100 text-green-800' :
+                            member.role === 'TeamMember' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {member.role === 'ProjectManager' ? 'Project Manager' : 'Team Member'}
+                          </span>
+                          <button
+                            onClick={() => handleRemoveTeamMember(member.id)}
+                            className="text-red-600 hover:text-red-800"
+                            title="Remove from project"
+                          >
+                            <X size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Users className="mx-auto text-gray-400 mb-4" size={48} />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Team Members</h3>
+                    <p className="text-gray-600">Click "Add Member" to assign team members to this project</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -458,8 +807,9 @@ const ProjectDetail = () => {
                       onChange={(e) => setTaskFormData({ ...taskFormData, status: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="To Do">To Do</option>
+                      <option value="New">New</option>
                       <option value="In Progress">In Progress</option>
+                      <option value="Blocked">Blocked</option>
                       <option value="Done">Done</option>
                     </select>
                   </div>
@@ -474,6 +824,7 @@ const ProjectDetail = () => {
                       <option value="Low">Low</option>
                       <option value="Medium">Medium</option>
                       <option value="High">High</option>
+                      <option value="Critical">Critical</option>
                     </select>
                   </div>
                 </div>
@@ -487,9 +838,14 @@ const ProjectDetail = () => {
                   >
                     <option value="">Unassigned</option>
                     {users.map(user => (
-                      <option key={user.id} value={user.id}>{user.name} ({user.role})</option>
+                      <option key={user.id} value={user.id}>
+                        {user.name} - {user.role === 'TeamMember' ? 'Team Member' : user.role === 'ProjectManager' ? 'Project Manager' : user.role}
+                      </option>
                     ))}
                   </select>
+                  {users.length === 0 && (
+                    <p className="text-xs text-gray-500 mt-1">No team members available</p>
+                  )}
                 </div>
 
                 <div>
@@ -533,18 +889,46 @@ const ProjectDetail = () => {
                 <X size={24} />
               </button>
             </div>
-            <div className="text-center py-8">
-              <Users className="mx-auto text-gray-400 mb-4" size={48} />
-              <p className="text-gray-600 mb-4">Team member assignment feature coming soon!</p>
-              <p className="text-sm text-gray-500">You can assign users to tasks when creating them.</p>
-            </div>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setShowTeamModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Close
-              </button>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Team Member</label>
+                <select
+                  value={selectedUserId}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Choose a user --</option>
+                  {users
+                    .filter(user => !teamMembers.some(member => member.id === user.id))
+                    .map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} ({user.email}) - {user.role === 'ProjectManager' ? 'Project Manager' : 'Team Member'}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Only users not already in this project are shown
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowTeamModal(false);
+                    setSelectedUserId('');
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddTeamMember}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Add Member
+                </button>
+              </div>
             </div>
           </div>
         </div>

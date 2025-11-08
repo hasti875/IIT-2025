@@ -151,7 +151,9 @@ const Projects = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredProjects.map((project) => {
-              const memberCount = Math.floor(Math.random() * 10) + 3;
+              const progress = project.progress || 0;
+              const taskCount = project.taskCount || 0;
+              const completedCount = project.completedTaskCount || 0;
               
               return (
                 <Link
@@ -175,34 +177,35 @@ const Projects = () => {
                   <div className="mb-4">
                     <div className="flex items-center justify-between text-xs mb-2">
                       <span className="text-gray-600">Progress</span>
-                      <span className="font-semibold text-gray-900">{project.progress}%</span>
+                      <span className="font-semibold text-gray-900">{progress}%</span>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                       <div 
-                        className={`h-full rounded-full transition-all ${getProgressBarColor(project.progress)}`}
-                        style={{ width: `${project.progress}%` }}
+                        className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor(progress)}`}
+                        style={{ width: `${progress}%` }}
                       />
+                    </div>
+                    <div className="flex items-center justify-between text-xs mt-1">
+                      <span className="text-gray-500">{completedCount} / {taskCount} tasks</span>
                     </div>
                   </div>
 
                   {/* Project Stats */}
                   <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-100">
                     <div className="text-center">
+                      <FolderKanban size={16} className="mx-auto text-gray-400 mb-1" />
+                      <p className="text-xs font-medium text-gray-900">{taskCount}</p>
+                      <p className="text-xs text-gray-500">Tasks</p>
+                    </div>
+                    <div className="text-center">
                       <Users size={16} className="mx-auto text-gray-400 mb-1" />
-                      <p className="text-xs font-medium text-gray-900">{memberCount}</p>
-                      <p className="text-xs text-gray-500">Team</p>
+                      <p className="text-xs font-medium text-gray-900">{project.teamMemberCount || 0}</p>
+                      <p className="text-xs text-gray-500">Members</p>
                     </div>
                     <div className="text-center">
                       <DollarSign size={16} className="mx-auto text-gray-400 mb-1" />
-                      <p className="text-xs font-medium text-gray-900">${(project.budget / 1000).toFixed(0)}k/${(project.budget / 1000).toFixed(0)}k</p>
+                      <p className="text-xs font-medium text-gray-900">${((project.budget || 0) / 1000).toFixed(0)}k</p>
                       <p className="text-xs text-gray-500">Budget</p>
-                    </div>
-                    <div className="text-center">
-                      <Calendar size={16} className="mx-auto text-gray-400 mb-1" />
-                      <p className="text-xs font-medium text-gray-900">
-                        {new Date(project.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </p>
-                      <p className="text-xs text-gray-500">Due Date</p>
                     </div>
                   </div>
                 </Link>

@@ -125,8 +125,6 @@ const Signup = () => {
               >
                 <option value="TeamMember">Team Member</option>
                 <option value="ProjectManager">Project Manager</option>
-                <option value="Finance">Finance</option>
-                <option value="Admin">Admin</option>
               </select>
             </div>
 

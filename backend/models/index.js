@@ -8,12 +8,18 @@ const Timesheet = require('./Timesheet');
 const CustomerInvoice = require('./CustomerInvoice');
 const VendorBill = require('./VendorBill');
 const OTP = require('./OTP');
+const ProjectTeam = require('./ProjectTeam');
+const ProjectMessage = require('./ProjectMessage');
 
 // Define Associations
 
 // User <-> Project (One-to-Many: User manages multiple projects)
 User.hasMany(Project, { foreignKey: 'managerId', as: 'managedProjects' });
 Project.belongsTo(User, { foreignKey: 'managerId', as: 'manager' });
+
+// User <-> Project (Many-to-Many: Project Team Members)
+User.belongsToMany(Project, { through: ProjectTeam, foreignKey: 'userId', as: 'projects' });
+Project.belongsToMany(User, { through: ProjectTeam, foreignKey: 'projectId', as: 'teamMembers' });
 
 // User <-> Task (One-to-Many: User can be assigned to multiple tasks)
 User.hasMany(Task, { foreignKey: 'assignedTo', as: 'assignedTasks' });
@@ -67,6 +73,14 @@ VendorBill.belongsTo(Project, { foreignKey: 'projectId', as: 'project' });
 PurchaseOrder.hasMany(VendorBill, { foreignKey: 'purchaseOrderId', as: 'bills' });
 VendorBill.belongsTo(PurchaseOrder, { foreignKey: 'purchaseOrderId', as: 'purchaseOrder' });
 
+// Project <-> ProjectMessage (One-to-Many: Project has multiple messages)
+Project.hasMany(ProjectMessage, { foreignKey: 'projectId', as: 'messages', onDelete: 'CASCADE' });
+ProjectMessage.belongsTo(Project, { foreignKey: 'projectId', as: 'project' });
+
+// User <-> ProjectMessage (One-to-Many: User sends multiple messages)
+User.hasMany(ProjectMessage, { foreignKey: 'userId', as: 'messages' });
+ProjectMessage.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 module.exports = {
   User,
   Project,
@@ -77,5 +91,7 @@ module.exports = {
   Timesheet,
   CustomerInvoice,
   VendorBill,
-  OTP
+  OTP,
+  ProjectTeam,
+  ProjectMessage
 };

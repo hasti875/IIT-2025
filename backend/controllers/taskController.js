@@ -12,6 +12,12 @@ exports.getAllTasks = async (req, res) => {
     if (status) where.status = status;
     if (assignedTo) where.assignedTo = assignedTo;
 
+    // Role-based filtering
+    // Team Members can only see tasks assigned to them
+    if (req.user && req.user.role === 'TeamMember') {
+      where.assignedTo = req.user.id;
+    }
+
     const tasks = await Task.findAll({
       where,
       include: [

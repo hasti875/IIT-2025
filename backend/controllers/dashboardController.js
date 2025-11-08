@@ -1,5 +1,6 @@
-const { Project, Task, SalesOrder, PurchaseOrder, Expense, User } = require('../models');
+const { Project, Task, SalesOrder, PurchaseOrder, Expense, User, Timesheet } = require('../models');
 const { sequelize } = require('../config/db');
+const { Op } = require('sequelize');
 
 // @desc    Get dashboard analytics
 // @route   GET /api/dashboard
@@ -16,6 +17,26 @@ exports.getDashboardAnalytics = async (req, res) => {
     const tasksDone = await Task.count({ where: { status: 'Done' } });
     const tasksInProgress = await Task.count({ where: { status: 'In Progress' } });
     const tasksNew = await Task.count({ where: { status: 'New' } });
+    const tasksBlocked = await Task.count({ where: { status: 'Blocked' } });
+
+    // Get current month date range
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    // Hours Logged (this month)
+    const timesheets = await Timesheet.findAll({
+      where: {
+        date: {
+          [Op.between]: [startOfMonth, endOfMonth]
+        }
+      },
+      attributes: ['hours', 'billable']
+    });
+
+    const totalHours = timesheets.reduce((sum, ts) => sum + parseFloat(ts.hours || 0), 0);
+    const billableHours = timesheets.filter(ts => ts.billable).reduce((sum, ts) => sum + parseFloat(ts.hours || 0), 0);
+    const nonBillableHours = totalHours - billableHours;
 
     // Financial Summary
     const salesOrders = await SalesOrder.findAll({ attributes: ['amount'] });
@@ -69,9 +90,13 @@ exports.getDashboardAnalytics = async (req, res) => {
           tasksDone,
           tasksInProgress,
           tasksNew,
+          tasksBlocked,
           totalRevenue,
           totalCost: totalPurchases + totalExpenses,
-          totalProfit
+          totalProfit,
+          hoursLogged: Math.round(totalHours),
+          billableHours: Math.round(billableHours),
+          nonBillableHours: Math.round(nonBillableHours)
         },
         recentProjects,
         projectFinancials

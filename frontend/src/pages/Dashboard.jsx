@@ -58,7 +58,7 @@ const Dashboard = () => {
     {
       title: 'Active Projects',
       value: summary.activeProjects,
-      subtitle: `+2 this month`,
+      subtitle: `${summary.totalProjects} total projects`,
       icon: FolderKanban,
       bgColor: 'bg-cyan-50',
       iconColor: 'text-cyan-500'
@@ -66,14 +66,14 @@ const Dashboard = () => {
     {
       title: 'Tasks Completed',
       value: summary.tasksDone,
-      subtitle: `+19% from last week`,
+      subtitle: `${summary.totalTasks} total tasks`,
       icon: CheckSquare,
       bgColor: 'bg-green-50',
       iconColor: 'text-green-500'
     },
     {
       title: 'Hours Logged',
-      value: '1,847',
+      value: summary.hoursLogged?.toLocaleString() || '0',
       subtitle: 'This month',
       icon: Clock,
       bgColor: 'bg-amber-50',
@@ -81,8 +81,8 @@ const Dashboard = () => {
     },
     {
       title: 'Revenue',
-      value: `$${summary.totalRevenue.toLocaleString()}`,
-      subtitle: `+12% from last month`,
+      value: `$${summary.totalRevenue?.toLocaleString() || '0'}`,
+      subtitle: `$${summary.totalProfit?.toLocaleString() || '0'} profit`,
       icon: TrendingUp,
       bgColor: 'bg-orange-50',
       iconColor: 'text-orange-500'
@@ -169,8 +169,7 @@ const Dashboard = () => {
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
             {projects.map((project) => {
-              // Mock data for member count
-              const memberCount = Math.floor(Math.random() * 10) + 3;
+              const memberCount = project.teamMemberCount || 0;
               const spent = Math.floor(project.budget * (project.progress / 100));
               
               return (
@@ -182,7 +181,7 @@ const Dashboard = () => {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-900 mb-1">{project.name}</h3>
-                      <p className="text-sm text-gray-500">{project.description || 'Acme Corp'}</p>
+                      <p className="text-sm text-gray-500">{project.clientName || 'Client Name'}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ml-3 ${getStatusColor(project.status)}`}>
                       {getStatusLabel(project.status)}

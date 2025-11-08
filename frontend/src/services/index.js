@@ -90,6 +90,38 @@ export const projectService = {
   delete: async (id) => {
     const response = await api.delete(`/projects/${id}`);
     return response.data;
+  },
+
+  // Team member management
+  getProjectTeam: async (id) => {
+    const response = await api.get(`/projects/${id}/team`);
+    return response.data;
+  },
+
+  addTeamMember: async (id, userId) => {
+    const response = await api.post(`/projects/${id}/team`, { userId });
+    return response.data;
+  },
+
+  removeTeamMember: async (id, userId) => {
+    const response = await api.delete(`/projects/${id}/team/${userId}`);
+    return response.data;
+  },
+
+  // Project messages
+  getMessages: async (projectId, params = {}) => {
+    const response = await api.get(`/projects/${projectId}/messages`, { params });
+    return response.data;
+  },
+
+  sendMessage: async (projectId, messageData) => {
+    const response = await api.post(`/projects/${projectId}/messages`, messageData);
+    return response.data;
+  },
+
+  deleteMessage: async (projectId, messageId) => {
+    const response = await api.delete(`/projects/${projectId}/messages/${messageId}`);
+    return response.data;
   }
 };
 
