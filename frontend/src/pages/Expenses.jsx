@@ -472,6 +472,7 @@ const Expenses = () => {
                   type="date"
                   value={newExpense.expenseDate}
                   onChange={(e) => setNewExpense({...newExpense, expenseDate: e.target.value})}
+                  max={new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split('T')[0]}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>

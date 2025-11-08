@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Clock, Plus, Calendar, Edit2, Trash2, X, Loader2 } from 'lucide-react';
+import { Clock, Plus, Calendar, Edit2, Trash2, X, Loader2, Download } from 'lucide-react';
 import { timesheetService, projectService, taskService, authService } from '../services';
 import RoleBasedLayout from '../components/RoleBasedLayout';
 
@@ -148,6 +148,51 @@ const Timesheets = () => {
     }
   };
 
+  const handleGenerateReport = () => {
+    try {
+      // Filter timesheets based on current filters
+      const dataToExport = filteredTimesheets;
+      
+      if (dataToExport.length === 0) {
+        alert('No timesheet data to export');
+        return;
+      }
+
+      // Create CSV content
+      const headers = ['Date', 'Project', 'Task', 'Hours', 'Billable', 'Status', 'Description'];
+      const csvContent = [
+        headers.join(','),
+        ...dataToExport.map(ts => [
+          new Date(ts.date).toLocaleDateString(),
+          ts.project?.name || 'N/A',
+          ts.task?.name || 'N/A',
+          ts.hours,
+          ts.billable ? 'Yes' : 'No',
+          ts.status,
+          `"${(ts.description || '').replace(/"/g, '""')}"`
+        ].join(','))
+      ].join('\n');
+
+      // Create download link
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `timesheet_report_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      alert('Timesheet report downloaded successfully!');
+    } catch (error) {
+      console.error('Error generating report:', error);
+      alert('Failed to generate timesheet report');
+    }
+  };
+
   const handleSubmitForApproval = async (id) => {
     try {
       await timesheetService.updateTimesheet(id, { status: 'Submitted' });
@@ -290,21 +335,48 @@ const Timesheets = () => {
             <p className="text-sm text-gray-500 mt-1">Track time spent on projects and tasks</p>
           </div>
           <div className="flex gap-3">
-            {filteredTimesheets.filter(ts => ts.status === 'Draft').length > 0 && (
-              <button 
-                onClick={handleBulkSubmit}
-                className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
-              >
-                Submit Drafts for Approval
-              </button>
+            {currentUser?.role !== 'Finance' && (
+              <>
+                {filteredTimesheets.filter(ts => ts.status === 'Draft').length > 0 && (
+                  <button 
+                    onClick={handleBulkSubmit}
+                    className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+                  >
+                    Submit Drafts for Approval
+                  </button>
+                )}
+                <button 
+                  onClick={handleGenerateReport}
+                  className="flex items-center gap-2 bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors"
+                  title="Download timesheet report as CSV"
+                >
+                  <Download size={20} />
+                  Generate Report
+                </button>
+                <button 
+                  onClick={() => handleOpenModal()}
+                  className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                  <Plus size={20} />
+                  Log Time
+                </button>
+              </>
             )}
-            <button 
-              onClick={() => handleOpenModal()}
-              className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              <Plus size={20} />
-              Log Time
-            </button>
+            {currentUser?.role === 'Finance' && (
+              <>
+                <button 
+                  onClick={handleGenerateReport}
+                  className="flex items-center gap-2 bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors"
+                  title="Download timesheet report as CSV"
+                >
+                  <Download size={20} />
+                  Generate Report
+                </button>
+                <div className="text-sm text-gray-500 italic flex items-center">
+                  Finance role cannot log timesheets
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -498,52 +570,59 @@ const Timesheets = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          {timesheet.status === 'Draft' && (
+                          {currentUser?.role !== 'Finance' && (
                             <>
-                              <button
-                                onClick={() => handleOpenModal(timesheet)}
-                                className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50"
-                                title="Edit"
-                                disabled={timesheet.status !== 'Draft'}
-                              >
-                                <Edit2 size={16} />
-                              </button>
-                              <button
-                                onClick={() => handleSubmitForApproval(timesheet.id)}
-                                className="text-green-600 hover:text-green-800 px-2 py-1 text-xs rounded hover:bg-green-50"
-                                title="Submit for Approval"
-                              >
-                                Submit
-                              </button>
-                              <button
-                                onClick={() => handleDelete(timesheet.id)}
-                                className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
-                                title="Delete"
-                              >
-                                <Trash2 size={16} />
-                              </button>
+                              {timesheet.status === 'Draft' && (
+                                <>
+                                  <button
+                                    onClick={() => handleOpenModal(timesheet)}
+                                    className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50"
+                                    title="Edit"
+                                    disabled={timesheet.status !== 'Draft'}
+                                  >
+                                    <Edit2 size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleSubmitForApproval(timesheet.id)}
+                                    className="text-green-600 hover:text-green-800 px-2 py-1 text-xs rounded hover:bg-green-50"
+                                    title="Submit for Approval"
+                                  >
+                                    Submit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(timesheet.id)}
+                                    className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
+                                    title="Delete"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </>
+                              )}
+                              {timesheet.status === 'Rejected' && (
+                                <>
+                                  <button
+                                    onClick={() => handleOpenModal(timesheet)}
+                                    className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50"
+                                    title="Edit"
+                                  >
+                                    <Edit2 size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(timesheet.id)}
+                                    className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
+                                    title="Delete"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </>
+                              )}
+                              {(timesheet.status === 'Submitted' || timesheet.status === 'Approved' || timesheet.status === 'Billed') && (
+                                <span className="text-xs text-gray-500">No actions</span>
+                              )}
                             </>
                           )}
-                          {timesheet.status === 'Rejected' && (
-                            <>
-                              <button
-                                onClick={() => handleOpenModal(timesheet)}
-                                className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50"
-                                title="Edit"
-                              >
-                                <Edit2 size={16} />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(timesheet.id)}
-                                className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
-                                title="Delete"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </>
-                          )}
-                          {(timesheet.status === 'Submitted' || timesheet.status === 'Approved' || timesheet.status === 'Billed') && (
-                            <span className="text-xs text-gray-500">No actions</span>
+                          {currentUser?.role === 'Finance' && (
+                            <span className="text-xs text-gray-500">View only</span>
                           )}
                         </div>
                       </td>
@@ -628,6 +707,7 @@ const Timesheets = () => {
                       type="date"
                       value={formData.date}
                       onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                      max={new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split('T')[0]}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     />

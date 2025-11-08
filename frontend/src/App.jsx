@@ -13,6 +13,7 @@ import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
 import Tasks from './pages/Tasks';
 import MyTasks from './pages/MyTasks';
+import TaskCalendar from './pages/TaskCalendar';
 import Finance from './pages/Finance';
 import SalesOrders from './pages/SalesOrders';
 import PurchaseOrders from './pages/PurchaseOrders';
@@ -90,6 +91,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <MyTasks />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/calendar"
+            element={
+              <ProtectedRoute>
+                <TaskCalendar />
               </ProtectedRoute>
             }
           />

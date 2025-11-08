@@ -56,9 +56,17 @@ exports.getAllTimesheets = async (req, res) => {
 
 // @desc    Create timesheet entry
 // @route   POST /api/timesheets
-// @access  Private
+// @access  Private (Team Members, Project Managers, Admins only)
 exports.createTimesheet = async (req, res) => {
   try {
+    // Finance role cannot log time
+    if (req.user.role === 'Finance') {
+      return res.status(403).json({
+        success: false,
+        message: 'Finance role is not authorized to log timesheets'
+      });
+    }
+
     const { taskId, projectId, date, hours, billable, description } = req.body;
 
     if (!taskId || !hours) {
@@ -130,15 +138,35 @@ exports.updateTimesheet = async (req, res) => {
       });
     }
 
-    // Team members can only update their own timesheets
-    if (req.user.role === 'TeamMember' && timesheet.userId !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to update this timesheet'
-      });
+    const { date, hours, billable, description, status } = req.body;
+
+    // Check if trying to approve/reject
+    if (status && (status === 'Approved' || status === 'Rejected')) {
+      // Only Project Managers and Admins can approve/reject
+      if (req.user.role !== 'ProjectManager' && req.user.role !== 'Admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only Project Managers and Admins can approve or reject timesheets'
+        });
+      }
+    } else {
+      // For regular updates, team members can only update their own timesheets
+      if (req.user.role === 'TeamMember' && timesheet.userId !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to update this timesheet'
+        });
+      }
+
+      // Finance role cannot update timesheets
+      if (req.user.role === 'Finance') {
+        return res.status(403).json({
+          success: false,
+          message: 'Finance role is not authorized to update timesheets'
+        });
+      }
     }
 
-    const { date, hours, billable, description, status } = req.body;
     const oldHours = timesheet.hours;
 
     await timesheet.update({
@@ -194,6 +222,14 @@ exports.deleteTimesheet = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Timesheet entry not found'
+      });
+    }
+
+    // Finance role cannot delete timesheets
+    if (req.user.role === 'Finance') {
+      return res.status(403).json({
+        success: false,
+        message: 'Finance role is not authorized to delete timesheets'
       });
     }
 

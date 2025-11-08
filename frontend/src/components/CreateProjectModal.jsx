@@ -15,12 +15,86 @@ const CreateProjectModal = ({ onClose, onSuccess }) => {
   const [error, setError] = useState('');
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    
+    // Validate date fields
+    if (name === 'startDate' || name === 'endDate') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const selectedDate = new Date(value);
+      selectedDate.setHours(0, 0, 0, 0);
+      
+      // Check if selected date is in the past
+      if (selectedDate < today) {
+        alert('Project dates cannot be in the past. Please select today or a future date.');
+        return;
+      }
+      
+      // If changing end date, ensure it's after start date
+      if (name === 'endDate' && formData.startDate) {
+        const startDate = new Date(formData.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        
+        if (selectedDate < startDate) {
+          alert('End date cannot be before the start date.');
+          return;
+        }
+      }
+      
+      // If changing start date and end date exists, ensure start is before end
+      if (name === 'startDate' && formData.endDate) {
+        const endDate = new Date(formData.endDate);
+        endDate.setHours(0, 0, 0, 0);
+        
+        if (selectedDate > endDate) {
+          alert('Start date cannot be after the end date.');
+          return;
+        }
+      }
+    }
+    
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    
+    // Validate dates before submission
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (formData.startDate) {
+      const startDate = new Date(formData.startDate);
+      startDate.setHours(0, 0, 0, 0);
+      
+      if (startDate < today) {
+        setError('Start date cannot be in the past. Please select today or a future date.');
+        return;
+      }
+    }
+    
+    if (formData.endDate) {
+      const endDate = new Date(formData.endDate);
+      endDate.setHours(0, 0, 0, 0);
+      
+      if (endDate < today) {
+        setError('End date cannot be in the past. Please select today or a future date.');
+        return;
+      }
+      
+      if (formData.startDate) {
+        const startDate = new Date(formData.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        
+        if (endDate < startDate) {
+          setError('End date cannot be before the start date.');
+          return;
+        }
+      }
+    }
+    
     setLoading(true);
 
     try {
@@ -115,28 +189,38 @@ const CreateProjectModal = ({ onClose, onSuccess }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Start Date
+                Start Date *
               </label>
               <input
                 type="date"
                 name="startDate"
+                required
                 value={formData.startDate}
                 onChange={handleChange}
+                min={new Date().toISOString().split('T')[0]}
                 className="input"
               />
+              <p className="text-xs text-gray-600 mt-1">
+                ⚠️ Project can start from today onwards
+              </p>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                End Date
+                End Date *
               </label>
               <input
                 type="date"
                 name="endDate"
+                required
                 value={formData.endDate}
                 onChange={handleChange}
+                min={formData.startDate || new Date().toISOString().split('T')[0]}
                 className="input"
               />
+              <p className="text-xs text-gray-600 mt-1">
+                ⚠️ Must be after or equal to start date
+              </p>
             </div>
           </div>
 

@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { projectService, taskService, financeService, userService, authService, timesheetService } from '../services';
-import { ArrowLeft, Plus, Loader2, Edit, DollarSign, Calendar, Users, FileText, ShoppingCart, Receipt, CreditCard, TrendingUp, X, Clock, Send, MessageCircle, Paperclip, Check, XCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, Edit, DollarSign, Calendar, Users, FileText, ShoppingCart, Receipt, CreditCard, TrendingUp, X, Clock, Send, MessageCircle, Paperclip, Check, XCircle, Trash2 } from 'lucide-react';
 import RoleBasedLayout from '../components/RoleBasedLayout';
+import ProjectCalendar from '../components/ProjectCalendar';
 import { useCurrency } from '../context/CurrencyContext';
 import { useSocket } from '../context/SocketContext';
 
@@ -25,8 +26,11 @@ const ProjectDetail = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [draggedTask, setDraggedTask] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
@@ -317,11 +321,44 @@ const ProjectDetail = () => {
 
   const handleCreateTask = async (e) => {
     e.preventDefault();
+    
+    // Validate due date is within project timeline
+    if (taskFormData.dueDate && project?.endDate) {
+      const taskDueDate = new Date(taskFormData.dueDate);
+      const projectEndDate = new Date(project.endDate);
+      
+      if (taskDueDate > projectEndDate) {
+        alert(`Task due date cannot be after the project deadline (${new Date(project.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })})`);
+        return;
+      }
+    }
+    
+    // Validate due date is not in the past
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    
+    if (taskFormData.dueDate) {
+      const taskDueDate = new Date(taskFormData.dueDate);
+      taskDueDate.setHours(0, 0, 0, 0);
+      
+      if (taskDueDate < tomorrow) {
+        alert('Task due date must be in the future (from tomorrow onwards)');
+        return;
+      }
+    }
+    
     try {
-      await taskService.create({
-        ...taskFormData,
-        projectId: id
-      });
+      if (isEditMode && editingTaskId) {
+        // Update existing task
+        await taskService.update(editingTaskId, taskFormData);
+      } else {
+        // Create new task
+        await taskService.create({
+          ...taskFormData,
+          projectId: id
+        });
+      }
       setShowTaskModal(false);
       setTaskFormData({
         name: '',
@@ -331,10 +368,38 @@ const ProjectDetail = () => {
         assignedTo: '',
         dueDate: ''
       });
+      setIsEditMode(false);
+      setEditingTaskId(null);
       fetchProjectData(); // Refresh tasks
     } catch (error) {
-      console.error('Failed to create task:', error);
-      alert('Failed to create task');
+      console.error('Failed to save task:', error);
+      alert('Failed to save task');
+    }
+  };
+
+  const handleEditTask = (task) => {
+    setTaskFormData({
+      name: task.name,
+      description: task.description || '',
+      status: task.status,
+      priority: task.priority,
+      assignedTo: task.assignedTo || '',
+      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
+    });
+    setIsEditMode(true);
+    setEditingTaskId(task.id);
+    setShowTaskModal(true);
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
+
+    try {
+      await taskService.delete(taskId);
+      fetchProjectData(); // Refresh tasks
+    } catch (error) {
+      console.error('Failed to delete task:', error);
+      alert('Failed to delete task');
     }
   };
 
@@ -467,14 +532,24 @@ const ProjectDetail = () => {
               <p className="text-gray-500 mt-1">{project.client || 'No client assigned'}</p>
               <p className="text-sm text-gray-600 mt-2">{project.description || 'No description'}</p>
             </div>
-            <span className={`px-4 py-1.5 rounded-full text-sm font-medium ${
-              project.status === 'Active' ? 'bg-blue-100 text-blue-700' :
-              project.status === 'Completed' ? 'bg-green-100 text-green-700' :
-              project.status === 'Planning' ? 'bg-orange-100 text-orange-700' :
-              'bg-gray-100 text-gray-700'
-            }`}>
-              {project.status}
-            </span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowCalendarModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg"
+                title="View Project Calendar"
+              >
+                <Calendar size={20} />
+                <span className="font-medium">Calendar</span>
+              </button>
+              <span className={`px-4 py-1.5 rounded-full text-sm font-medium ${
+                project.status === 'Active' ? 'bg-blue-100 text-blue-700' :
+                project.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                project.status === 'Planning' ? 'bg-orange-100 text-orange-700' :
+                'bg-gray-100 text-gray-700'
+              }`}>
+                {project.status}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -601,7 +676,19 @@ const ProjectDetail = () => {
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-xl font-bold text-gray-900">Project Tasks</h2>
                   <button 
-                    onClick={() => setShowTaskModal(true)}
+                    onClick={() => {
+                      setIsEditMode(false);
+                      setEditingTaskId(null);
+                      setTaskFormData({
+                        name: '',
+                        description: '',
+                        status: 'New',
+                        priority: 'Medium',
+                        assignedTo: '',
+                        dueDate: ''
+                      });
+                      setShowTaskModal(true);
+                    }}
                     className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
                   >
                     <Plus size={20} />
@@ -639,11 +726,39 @@ const ProjectDetail = () => {
                                 draggable="true"
                                 onDragStart={(e) => handleTaskDragStart(e, task)}
                                 onDragEnd={handleTaskDragEnd}
-                                className={`bg-white p-3 rounded-lg shadow-sm border hover:shadow-md transition-all cursor-move ${
+                                className={`group relative bg-white p-3 rounded-lg shadow-sm border hover:shadow-md transition-all cursor-move ${
                                   draggedTask?.id === task.id ? 'opacity-50' : ''
                                 }`}
                               >
-                                <h4 className="font-medium text-gray-900 text-sm mb-1">{task.name}</h4>
+                                {/* Edit/Delete buttons - shown on hover for Project Managers */}
+                                {currentUser?.role === 'ProjectManager' && (
+                                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditTask(task);
+                                      }}
+                                      className="p-1 bg-white text-blue-600 hover:bg-blue-50 rounded shadow-sm border border-blue-200 transition-colors"
+                                      title="Edit task"
+                                    >
+                                      <Edit size={14} />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteTask(task.id);
+                                      }}
+                                      className="p-1 bg-white text-red-600 hover:bg-red-50 rounded shadow-sm border border-red-200 transition-colors"
+                                      title="Delete task"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                )}
+                                
+                                <div className="mb-1">
+                                  <h4 className="font-medium text-gray-900 text-sm pr-16">{task.name}</h4>
+                                </div>
                                 {task.description && (
                                   <p className="text-xs text-gray-600 mb-2 line-clamp-2">{task.description}</p>
                                 )}
@@ -658,7 +773,9 @@ const ProjectDetail = () => {
                                     </div>
                                   )}
                                   {task.priority && (
-                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium transition-all ${
+                                      currentUser?.role === 'ProjectManager' ? 'group-hover:mr-16' : ''
+                                    } ${
                                       task.priority === 'Critical' ? 'bg-red-100 text-red-700' :
                                       task.priority === 'High' ? 'bg-orange-100 text-orange-700' :
                                       task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
@@ -910,7 +1027,7 @@ const ProjectDetail = () => {
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            {timesheet.status === 'Submitted' && (
+                            {timesheet.status === 'Submitted' && (currentUser?.role === 'ProjectManager' || currentUser?.role === 'Admin') && (
                               <div className="flex gap-2">
                                 <button
                                   onClick={() => handleApproveTimesheet(timesheet.id)}
@@ -928,7 +1045,7 @@ const ProjectDetail = () => {
                                 </button>
                               </div>
                             )}
-                            {timesheet.status !== 'Submitted' && (
+                            {(timesheet.status !== 'Submitted' || (currentUser?.role !== 'ProjectManager' && currentUser?.role !== 'Admin')) && (
                               <span className="text-xs text-gray-400">-</span>
                             )}
                           </td>
@@ -1007,13 +1124,28 @@ const ProjectDetail = () => {
         </div>
       </div>
 
-      {/* Create Task Modal */}
+      {/* Create/Edit Task Modal */}
       {showTaskModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Create New Task</h2>
-              <button onClick={() => setShowTaskModal(false)} className="text-gray-500 hover:text-gray-700">
+              <h2 className="text-xl font-bold">{isEditMode ? 'Edit Task' : 'Create New Task'}</h2>
+              <button 
+                onClick={() => {
+                  setShowTaskModal(false);
+                  setIsEditMode(false);
+                  setEditingTaskId(null);
+                  setTaskFormData({
+                    name: '',
+                    description: '',
+                    status: 'New',
+                    priority: 'Medium',
+                    assignedTo: '',
+                    dueDate: ''
+                  });
+                }} 
+                className="text-gray-500 hover:text-gray-700"
+              >
                 <X size={24} />
               </button>
             </div>
@@ -1080,13 +1212,18 @@ const ProjectDetail = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Unassigned</option>
-                    {teamMembers.map(member => (
-                      <option key={member.user?.id || member.id} value={member.user?.id || member.id}>
-                        {member.user?.name || member.name} - {member.user?.role === 'TeamMember' ? 'Team Member' : member.user?.role === 'ProjectManager' ? 'Project Manager' : member.user?.role || member.role}
-                      </option>
-                    ))}
+                    {teamMembers
+                      .filter(member => {
+                        const role = member.user?.role || member.role;
+                        return role === 'TeamMember';
+                      })
+                      .map(member => (
+                        <option key={member.user?.id || member.id} value={member.user?.id || member.id}>
+                          {member.user?.name || member.name} - TeamMember
+                        </option>
+                      ))}
                   </select>
-                  {teamMembers.length === 0 && (
+                  {teamMembers.filter(m => (m.user?.role || m.role) === 'TeamMember').length === 0 && (
                     <p className="text-xs text-gray-500 mt-1">No team members available</p>
                   )}
                 </div>
@@ -1096,16 +1233,47 @@ const ProjectDetail = () => {
                   <input
                     type="date"
                     value={taskFormData.dueDate}
-                    onChange={(e) => setTaskFormData({ ...taskFormData, dueDate: e.target.value })}
+                    onChange={(e) => {
+                      const selectedDate = new Date(e.target.value);
+                      const projectEnd = project?.endDate ? new Date(project.endDate) : null;
+                      
+                      // Warn if date is after project deadline
+                      if (projectEnd && selectedDate > projectEnd) {
+                        alert(`Cannot select a date after the project deadline (${projectEnd.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })})`);
+                        return;
+                      }
+                      
+                      setTaskFormData({ ...taskFormData, dueDate: e.target.value });
+                    }}
+                    min={new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0]}
+                    max={project?.endDate ? new Date(project.endDate).toISOString().split('T')[0] : undefined}
+                    required
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
+                  {project?.endDate && (
+                    <p className="text-xs text-red-600 mt-1 font-medium">
+                      ⚠️ Task must be completed by: {new Date(project.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => setShowTaskModal(false)}
+                  onClick={() => {
+                    setShowTaskModal(false);
+                    setIsEditMode(false);
+                    setEditingTaskId(null);
+                    setTaskFormData({
+                      name: '',
+                      description: '',
+                      status: 'New',
+                      priority: 'Medium',
+                      assignedTo: '',
+                      dueDate: ''
+                    });
+                  }}
                   className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   Cancel
@@ -1114,7 +1282,7 @@ const ProjectDetail = () => {
                   type="submit"
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
-                  Create Task
+                  {isEditMode ? 'Update Task' : 'Create Task'}
                 </button>
               </div>
             </form>
@@ -1175,6 +1343,15 @@ const ProjectDetail = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Calendar Modal */}
+      {showCalendarModal && (
+        <ProjectCalendar
+          project={project}
+          tasks={tasks}
+          onClose={() => setShowCalendarModal(false)}
+        />
       )}
     </RoleBasedLayout>
   );

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { projectService, authService } from '../services';
+import { projectService, authService, taskService } from '../services';
 import { Search, Loader2, FolderKanban, Users, DollarSign, Calendar, Trash2 } from 'lucide-react';
 import RoleBasedLayout from '../components/RoleBasedLayout';
 import CreateProjectModal from '../components/CreateProjectModal';
+import ProjectCalendar from '../components/ProjectCalendar';
 import { useCurrency } from '../context/CurrencyContext';
 
 const Projects = () => {
@@ -13,6 +14,9 @@ const Projects = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Projects');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [selectedProjectTasks, setSelectedProjectTasks] = useState([]);
   const currentUser = authService.getCurrentUser();
   const canCreateProject = currentUser?.role !== 'TeamMember';
 
@@ -76,6 +80,22 @@ const Projects = () => {
     }
     
     return false;
+  };
+
+  const handleOpenCalendar = async (project, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    try {
+      // Fetch tasks for this project
+      const response = await taskService.getAll({ projectId: project.id });
+      setSelectedProject(project);
+      setSelectedProjectTasks(response.data || []);
+      setShowCalendarModal(true);
+    } catch (error) {
+      console.error('Failed to fetch project tasks:', error);
+      alert('Failed to load project calendar');
+    }
   };
 
   const getStatusColor = (status) => {
@@ -262,6 +282,17 @@ const Projects = () => {
                   </div>
                   </Link>
 
+                  {/* Calendar Button */}
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <button
+                      onClick={(e) => handleOpenCalendar(project, e)}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-700 rounded-lg hover:from-purple-100 hover:to-indigo-100 transition-all"
+                    >
+                      <Calendar size={16} />
+                      <span className="text-sm font-medium">View Timeline</span>
+                    </button>
+                  </div>
+
                   {/* Delete Button - Shows on hover, only for authorized users */}
                   {canDeleteProject(project) && (
                     <button
@@ -285,6 +316,19 @@ const Projects = () => {
           onSuccess={() => {
             setShowCreateModal(false);
             fetchProjects();
+          }}
+        />
+      )}
+
+      {/* Calendar Modal */}
+      {showCalendarModal && selectedProject && (
+        <ProjectCalendar
+          project={selectedProject}
+          tasks={selectedProjectTasks}
+          onClose={() => {
+            setShowCalendarModal(false);
+            setSelectedProject(null);
+            setSelectedProjectTasks([]);
           }}
         />
       )}

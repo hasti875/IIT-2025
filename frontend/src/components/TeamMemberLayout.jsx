@@ -1,17 +1,18 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, FolderKanban, CheckSquare, DollarSign } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, CheckSquare, DollarSign, Calendar } from 'lucide-react';
 
 const TeamMemberLayout = ({ children }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Only 4 navigation items for Team Member
+  // Only 5 navigation items for Team Member
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Projects', href: '/projects', icon: FolderKanban },
     { name: 'Tasks', href: '/tasks', icon: CheckSquare },
+    { name: 'Calendar', href: '/calendar', icon: Calendar },
     { name: 'Expenses', href: '/expenses', icon: DollarSign },
   ];
 
