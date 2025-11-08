@@ -52,7 +52,7 @@ const Layout = ({ children }) => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-4 py-6 space-y-1">
           {navigation.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -103,7 +103,7 @@ const Layout = ({ children }) => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-8">
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-8 scrollbar-thin">
           {children}
         </main>
       </div>

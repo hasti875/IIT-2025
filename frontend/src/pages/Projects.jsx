@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { projectService, authService } from '../services';
-import { Search, Loader2, FolderKanban, Users, DollarSign, Calendar } from 'lucide-react';
+import { Search, Loader2, FolderKanban, Users, DollarSign, Calendar, Trash2 } from 'lucide-react';
 import RoleBasedLayout from '../components/RoleBasedLayout';
 import CreateProjectModal from '../components/CreateProjectModal';
 import { useCurrency } from '../context/CurrencyContext';
@@ -30,6 +30,52 @@ const Projects = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteProject = async (projectId, projectName, e) => {
+    // Prevent navigation to project detail page
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Confirm deletion
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${projectName}"?\n\n` +
+      `This will permanently delete:\n` +
+      `• All tasks\n` +
+      `• All team assignments\n` +
+      `• All chat messages\n` +
+      `• All expenses\n` +
+      `• All sales and purchase orders\n\n` +
+      `This action cannot be undone!`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await projectService.deleteProject(projectId);
+      
+      // Remove from local state
+      setProjects(projects.filter(p => p.id !== projectId));
+      
+      // Show success message
+      alert(`Project "${projectName}" has been deleted successfully!`);
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to delete project. Please try again.';
+      alert(`Error: ${errorMessage}`);
+    }
+  };
+
+  const canDeleteProject = (project) => {
+    // Admins can delete any project
+    if (currentUser?.role === 'Admin') return true;
+    
+    // Project Managers can only delete their own projects
+    if (currentUser?.role === 'ProjectManager' && project.manager?.id === currentUser.id) {
+      return true;
+    }
+    
+    return false;
   };
 
   const getStatusColor = (status) => {
@@ -162,16 +208,16 @@ const Projects = () => {
               const completedCount = project.completedTaskCount || 0;
               
               return (
-                <Link
+                <div
                   key={project.id}
-                  to={`/projects/${project.id}`}
-                  className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-lg transition-all cursor-pointer"
+                  className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-lg transition-all relative group"
                 >
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-1">
-                        {project.name}
-                      </h3>
+                  <Link to={`/projects/${project.id}`} className="block">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 mb-1">
+                          {project.name}
+                        </h3>
                       <p className="text-sm text-gray-500">{project.description || 'No description'}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ml-3 whitespace-nowrap ${getStatusColor(project.status)}`}>
@@ -214,7 +260,19 @@ const Projects = () => {
                       <p className="text-xs text-gray-500">Budget</p>
                     </div>
                   </div>
-                </Link>
+                  </Link>
+
+                  {/* Delete Button - Shows on hover, only for authorized users */}
+                  {canDeleteProject(project) && (
+                    <button
+                      onClick={(e) => handleDeleteProject(project.id, project.name, e)}
+                      className="absolute top-3 right-3 p-2 bg-red-50 text-red-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-100"
+                      title="Delete Project"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>

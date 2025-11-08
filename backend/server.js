@@ -1,8 +1,19 @@
+const http = require('http');
 const app = require('./app');
 const { connectDB } = require('./config/db');
+const { initializeSocket } = require('./config/socket');
 require('./models'); // Import models to register associations
 
 const PORT = process.env.PORT || 5000;
+
+// Create HTTP server (needed for Socket.IO)
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+const io = initializeSocket(server);
+
+// Make io accessible to controllers
+app.set('io', io);
 
 // Connect to database and start server
 const startServer = async () => {
@@ -10,8 +21,8 @@ const startServer = async () => {
     // Connect to PostgreSQL
     await connectDB();
 
-    // Start Express server
-    app.listen(PORT, () => {
+    // Start HTTP server with Socket.IO
+    server.listen(PORT, () => {
       console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
@@ -20,6 +31,7 @@ const startServer = async () => {
 ║   Server running on port ${PORT}                            ║
 ║   Environment: ${process.env.NODE_ENV || 'development'}                       ║
 ║   API Base URL: http://localhost:${PORT}/api              ║
+║   Socket.IO: ✅ Real-time enabled                         ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
       `);

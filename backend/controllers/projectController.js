@@ -55,13 +55,23 @@ exports.getAllProjects = async (req, res) => {
       const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
       const teamMemberCount = projectData.teamMembers ? projectData.teamMembers.length : 0;
       
-      // Auto-update project status if all tasks are completed
-      if (totalTasks > 0 && completedTasks === totalTasks && projectData.status !== 'Completed') {
-        await Project.update(
-          { status: 'Completed' },
-          { where: { id: projectData.id } }
-        );
-        projectData.status = 'Completed';
+      // Auto-update project status based on task completion
+      if (totalTasks > 0) {
+        if (completedTasks === totalTasks && projectData.status !== 'Completed') {
+          // All tasks done → Mark as Completed
+          await Project.update(
+            { status: 'Completed' },
+            { where: { id: projectData.id } }
+          );
+          projectData.status = 'Completed';
+        } else if (completedTasks < totalTasks && projectData.status === 'Completed') {
+          // Not all tasks done but project marked as Completed → Revert to Active
+          await Project.update(
+            { status: 'Active' },
+            { where: { id: projectData.id } }
+          );
+          projectData.status = 'Active';
+        }
       }
       
       return {
@@ -256,7 +266,7 @@ exports.updateProject = async (req, res) => {
 
 // @desc    Delete project
 // @route   DELETE /api/projects/:id
-// @access  Private (Admin)
+// @access  Private (ProjectManager - own projects, Admin - all projects)
 exports.deleteProject = async (req, res) => {
   try {
     const project = await Project.findByPk(req.params.id);
@@ -265,6 +275,16 @@ exports.deleteProject = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Project not found'
+      });
+    }
+
+    // Check permissions:
+    // - Admins can delete any project
+    // - ProjectManagers can only delete their own projects
+    if (req.user.role === 'ProjectManager' && project.managerId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized. You can only delete projects you manage.'
       });
     }
 

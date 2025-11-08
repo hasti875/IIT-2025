@@ -9,7 +9,14 @@ exports.getAllTimesheets = async (req, res) => {
     const { userId, taskId, projectId, startDate, endDate, status } = req.query;
     const where = {};
 
-    if (userId) where.userId = userId;
+    // Team members can only see their own timesheets
+    if (req.user.role === 'TeamMember') {
+      where.userId = req.user.id;
+    } else if (userId) {
+      // Admins and Project Managers can filter by user
+      where.userId = userId;
+    }
+
     if (taskId) where.taskId = taskId;
     if (projectId) where.projectId = projectId;
     if (status) where.status = status;
@@ -123,6 +130,14 @@ exports.updateTimesheet = async (req, res) => {
       });
     }
 
+    // Team members can only update their own timesheets
+    if (req.user.role === 'TeamMember' && timesheet.userId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this timesheet'
+      });
+    }
+
     const { date, hours, billable, description, status } = req.body;
     const oldHours = timesheet.hours;
 
@@ -137,10 +152,12 @@ exports.updateTimesheet = async (req, res) => {
     // Update task hours if changed
     if (hours && hours !== oldHours) {
       const task = await Task.findByPk(timesheet.taskId);
-      const hoursDiff = parseFloat(hours) - parseFloat(oldHours);
-      await task.update({
-        hoursLogged: parseFloat(task.hoursLogged) + hoursDiff
-      });
+      if (task) {
+        const hoursDiff = parseFloat(hours) - parseFloat(oldHours);
+        await task.update({
+          hoursLogged: Math.max(0, parseFloat(task.hoursLogged || 0) + hoursDiff)
+        });
+      }
     }
 
     const updatedTimesheet = await Timesheet.findByPk(timesheet.id, {
@@ -180,11 +197,21 @@ exports.deleteTimesheet = async (req, res) => {
       });
     }
 
+    // Team members can only delete their own timesheets
+    if (req.user.role === 'TeamMember' && timesheet.userId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete this timesheet'
+      });
+    }
+
     // Update task hours
     const task = await Task.findByPk(timesheet.taskId);
-    await task.update({
-      hoursLogged: Math.max(0, parseFloat(task.hoursLogged) - parseFloat(timesheet.hours))
-    });
+    if (task) {
+      await task.update({
+        hoursLogged: Math.max(0, parseFloat(task.hoursLogged || 0) - parseFloat(timesheet.hours))
+      });
+    }
 
     await timesheet.destroy();
 

@@ -92,6 +92,11 @@ export const projectService = {
     return response.data;
   },
 
+  deleteProject: async (id) => {
+    const response = await api.delete(`/projects/${id}`);
+    return response.data;
+  },
+
   // Team member management
   getProjectTeam: async (id) => {
     const response = await api.get(`/projects/${id}/team`);

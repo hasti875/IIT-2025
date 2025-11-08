@@ -1,8 +1,14 @@
 const { Task, User, Project } = require('../models');
 
-// Helper function to check and update project status based on tasks
+/**
+ * HELPER FUNCTION: Update Project Status Based on Tasks
+ * Automatically sets project status based on task completion:
+ * - All tasks "Done" → Project "Completed"
+ * - Any task NOT "Done" → Project "Active"
+ */
 const updateProjectStatus = async (projectId) => {
   try {
+    // Get all tasks for this project
     const tasks = await Task.findAll({
       where: { projectId },
       attributes: ['id', 'status']
@@ -12,14 +18,23 @@ const updateProjectStatus = async (projectId) => {
       return; // No tasks, don't change project status
     }
 
+    // Check if ALL tasks are done
     const allTasksDone = tasks.every(task => task.status === 'Done');
     
     if (allTasksDone) {
+      // All tasks completed → Mark project as Completed
       await Project.update(
         { status: 'Completed' },
         { where: { id: projectId } }
       );
-      console.log(`Project ${projectId} status updated to Completed - all tasks done`);
+      console.log(`✅ Project ${projectId} status updated to Completed - all tasks done`);
+    } else {
+      // At least one task is NOT done → Mark project as Active
+      await Project.update(
+        { status: 'Active' },
+        { where: { id: projectId } }
+      );
+      console.log(`🔄 Project ${projectId} status updated to Active - tasks in progress`);
     }
   } catch (error) {
     console.error('Error updating project status:', error);

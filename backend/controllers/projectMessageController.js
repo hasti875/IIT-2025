@@ -1,6 +1,11 @@
 const { ProjectMessage, User } = require('../models');
 const { Op } = require('sequelize');
 
+/**
+ * PROJECT MESSAGE CONTROLLER
+ * Handles chat messages in projects with real-time Socket.IO support
+ */
+
 // @desc    Get all messages for a project
 // @route   GET /api/projects/:projectId/messages
 // @access  Private
@@ -38,7 +43,7 @@ exports.getProjectMessages = async (req, res) => {
   }
 };
 
-// @desc    Create a new message in a project
+// @desc    Create a new message in a project (with real-time broadcast)
 // @route   POST /api/projects/:projectId/messages
 // @access  Private
 exports.createProjectMessage = async (req, res) => {
@@ -54,6 +59,7 @@ exports.createProjectMessage = async (req, res) => {
       });
     }
 
+    // Create message in database
     const newMessage = await ProjectMessage.create({
       projectId,
       userId,
@@ -73,6 +79,16 @@ exports.createProjectMessage = async (req, res) => {
       ]
     });
 
+    // 🚀 REAL-TIME UPDATE: Broadcast new message to all users in this project room
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`project-${projectId}`).emit('new-message', {
+        message: messageWithUser,
+        projectId
+      });
+      console.log(`📨 Broadcasting new message to project-${projectId}`);
+    }
+
     res.status(201).json({
       success: true,
       data: messageWithUser
@@ -87,12 +103,12 @@ exports.createProjectMessage = async (req, res) => {
   }
 };
 
-// @desc    Delete a message
+// @desc    Delete a message (with real-time broadcast)
 // @route   DELETE /api/projects/:projectId/messages/:messageId
 // @access  Private (Own messages only or Admin/PM)
 exports.deleteProjectMessage = async (req, res) => {
   try {
-    const { messageId } = req.params;
+    const { messageId, projectId } = req.params;
     const userId = req.user.id;
     const userRole = req.user.role;
 
@@ -114,6 +130,16 @@ exports.deleteProjectMessage = async (req, res) => {
     }
 
     await message.destroy();
+
+    // 🚀 REAL-TIME UPDATE: Broadcast message deletion to all users in this project room
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`project-${projectId}`).emit('delete-message', {
+        messageId,
+        projectId
+      });
+      console.log(`🗑️ Broadcasting message deletion to project-${projectId}`);
+    }
 
     res.status(200).json({
       success: true,

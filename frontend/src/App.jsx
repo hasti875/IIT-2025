@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CurrencyProvider } from './context/CurrencyContext';
+import { SocketProvider } from './context/SocketContext';
 import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute';
 
 // Pages
@@ -26,8 +27,9 @@ function App() {
   return (
     <AuthProvider>
       <CurrencyProvider>
-        <BrowserRouter>
-          <Routes>
+        <SocketProvider>
+          <BrowserRouter>
+            <Routes>
           {/* Public Routes */}
           <Route
             path="/login"
@@ -171,6 +173,7 @@ function App() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
+        </SocketProvider>
       </CurrencyProvider>
     </AuthProvider>
   );

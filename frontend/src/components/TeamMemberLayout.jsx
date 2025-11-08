@@ -70,12 +70,12 @@ const TeamMemberLayout = ({ children }) => {
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
               <span className="text-xs font-semibold text-white">
-                TM
+                {user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'TM'}
               </span>
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium text-white">Team Member</p>
-              <p className="text-xs text-gray-400">{user?.role || 'Team Member'}</p>
+              <p className="text-sm font-medium text-white">{user?.name || 'Team Member'}</p>
+              <p className="text-xs text-gray-400">{user?.role || 'TeamMember'}</p>
             </div>
           </div>
         </div>
@@ -97,7 +97,7 @@ const TeamMemberLayout = ({ children }) => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50">
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-8">
           {children}
         </main>
       </div>

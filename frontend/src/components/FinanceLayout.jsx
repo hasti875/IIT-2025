@@ -70,11 +70,11 @@ const FinanceLayout = ({ children }) => {
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
               <span className="text-xs font-semibold text-white">
-                SF
+                {user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'SF'}
               </span>
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium text-white">Sales / Finance</p>
+              <p className="text-sm font-medium text-white">{user?.name || 'Finance User'}</p>
               <p className="text-xs text-gray-400">{user?.role || 'Finance'}</p>
             </div>
           </div>
@@ -97,7 +97,7 @@ const FinanceLayout = ({ children }) => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50">
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-8">
           {children}
         </main>
       </div>

@@ -29,13 +29,13 @@ const Timesheet = sequelize.define('Timesheet', {
   },
   projectId: {
     type: DataTypes.UUID,
-    allowNull: true,
+    allowNull: false,
     field: 'project_id',
     references: {
       model: 'projects',
       key: 'id'
     },
-    onDelete: 'SET NULL'
+    onDelete: 'CASCADE'
   },
   employee: {
     type: DataTypes.STRING,

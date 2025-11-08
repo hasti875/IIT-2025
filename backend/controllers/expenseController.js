@@ -432,7 +432,7 @@ exports.generateExpenseReceipt = async (req, res) => {
     const amountY = doc.y + 20;
     doc.fontSize(12).font('Helvetica-Bold').fillColor('#000000').text('Total Amount:', 60, amountY);
     doc.fontSize(20).font('Helvetica-Bold').text(
-      `₹${parseFloat(expense.amount).toFixed(2)}`,
+      `Rs. ${parseFloat(expense.amount).toFixed(2)}`,
       400,
       amountY,
       { align: 'right', width: 140 }

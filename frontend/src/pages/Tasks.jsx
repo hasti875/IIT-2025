@@ -119,10 +119,6 @@ const Tasks = () => {
             <h1 className="text-2xl font-bold text-gray-900">Task Board</h1>
             <p className="text-sm text-gray-500 mt-1">Manage tasks across all projects</p>
           </div>
-          <button className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
-            <span className="text-xl">+</span>
-            New Task
-          </button>
         </div>
 
         {loading ? (

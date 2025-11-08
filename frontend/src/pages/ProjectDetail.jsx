@@ -1,12 +1,14 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projectService, taskService, financeService, userService, authService } from '../services';
-import { ArrowLeft, Plus, Loader2, Edit, DollarSign, Calendar, Users, FileText, ShoppingCart, Receipt, CreditCard, TrendingUp, X, Clock, Send, MessageCircle, Paperclip } from 'lucide-react';
+import { projectService, taskService, financeService, userService, authService, timesheetService } from '../services';
+import { ArrowLeft, Plus, Loader2, Edit, DollarSign, Calendar, Users, FileText, ShoppingCart, Receipt, CreditCard, TrendingUp, X, Clock, Send, MessageCircle, Paperclip, Check, XCircle } from 'lucide-react';
 import RoleBasedLayout from '../components/RoleBasedLayout';
 import { useCurrency } from '../context/CurrencyContext';
+import { useSocket } from '../context/SocketContext';
 
 const ProjectDetail = () => {
   const { formatAmount, currencySymbol } = useCurrency();
+  const { socket, connected } = useSocket();
   const { id } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
@@ -28,6 +30,8 @@ const ProjectDetail = () => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [projectTimesheets, setProjectTimesheets] = useState([]);
+  const [timesheetFilter, setTimesheetFilter] = useState('all');
   const messagesEndRef = useRef(null);
   const currentUser = authService.getCurrentUser();
   const [taskFormData, setTaskFormData] = useState({
@@ -45,6 +49,7 @@ const ProjectDetail = () => {
     fetchTeamMembers();
     fetchFinancialDocs();
     fetchMessages();
+    fetchProjectTimesheets();
   }, [id]);
 
   useEffect(() => {
@@ -54,6 +59,40 @@ const ProjectDetail = () => {
   useEffect(() => {
     console.log('Team members state updated:', teamMembers);
   }, [teamMembers]);
+
+  // Join project room and listen for Socket.IO events
+  useEffect(() => {
+    if (!socket || !id) return;
+
+    // Join the project room
+    socket.emit('join-project', id);
+
+    // Listen for new messages
+    const handleNewMessage = (data) => {
+      // Compare project IDs as strings to avoid type mismatches between server and client
+      if (String(data.projectId) === String(id)) {
+        setMessages(prev => [...prev, data.message]);
+      }
+    };
+
+    // Listen for deleted messages
+    const handleDeleteMessage = (data) => {
+      // Compare IDs as strings to be robust against type differences
+      if (String(data.projectId) === String(id)) {
+        setMessages(prev => prev.filter(msg => String(msg.id) !== String(data.messageId)));
+      }
+    };
+
+    socket.on('new-message', handleNewMessage);
+    socket.on('delete-message', handleDeleteMessage);
+
+    // Cleanup: leave room and remove listeners
+    return () => {
+      socket.emit('leave-project', id);
+      socket.off('new-message', handleNewMessage);
+      socket.off('delete-message', handleDeleteMessage);
+    };
+  }, [socket, id]);
 
   const fetchProjectData = async () => {
     try {
@@ -126,6 +165,52 @@ const ProjectDetail = () => {
     }
   };
 
+  const fetchProjectTimesheets = async () => {
+    try {
+      const response = await timesheetService.getTimesheets({ projectId: id });
+      setProjectTimesheets(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch project timesheets:', error);
+    }
+  };
+
+  const handleApproveTimesheet = async (timesheetId) => {
+    try {
+      await timesheetService.updateTimesheet(timesheetId, { status: 'Approved' });
+      fetchProjectTimesheets();
+      alert('Timesheet approved successfully!');
+    } catch (error) {
+      console.error('Failed to approve timesheet:', error);
+      alert('Failed to approve timesheet');
+    }
+  };
+
+  const handleRejectTimesheet = async (timesheetId) => {
+    const reason = prompt('Enter reason for rejection (optional):');
+    try {
+      await timesheetService.updateTimesheet(timesheetId, { 
+        status: 'Rejected',
+        rejectionReason: reason 
+      });
+      fetchProjectTimesheets();
+      alert('Timesheet rejected');
+    } catch (error) {
+      console.error('Failed to reject timesheet:', error);
+      alert('Failed to reject timesheet');
+    }
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      'Draft': 'bg-gray-100 text-gray-800',
+      'Submitted': 'bg-blue-100 text-blue-800',
+      'Approved': 'bg-green-100 text-green-800',
+      'Rejected': 'bg-red-100 text-red-800',
+      'Billed': 'bg-purple-100 text-purple-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -136,10 +221,10 @@ const ProjectDetail = () => {
 
     try {
       setSendingMessage(true);
-      const response = await projectService.sendMessage(id, {
+      await projectService.sendMessage(id, {
         message: newMessage.trim()
       });
-      setMessages([...messages, response.data]);
+      // Don't update messages here - Socket.IO will handle it via 'new-message' event
       setNewMessage('');
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -154,7 +239,7 @@ const ProjectDetail = () => {
 
     try {
       await projectService.deleteMessage(id, messageId);
-      setMessages(messages.filter(msg => msg.id !== messageId));
+      // Don't update messages here - Socket.IO will handle it via 'delete-message' event
     } catch (error) {
       console.error('Failed to delete message:', error);
       alert('Failed to delete message');
@@ -314,6 +399,7 @@ const ProjectDetail = () => {
   const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'tasks', label: 'Tasks' },
+    { id: 'timesheets', label: 'Timesheets' },
     { id: 'chat', label: 'Chat' },
     { id: 'team', label: 'Team' }
   ];
@@ -676,6 +762,14 @@ const ProjectDetail = () => {
                   )}
                 </div>
 
+                {/* Connection Status */}
+                {!connected && (
+                  <div className="mb-3 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                    Reconnecting to chat...
+                  </div>
+                )}
+
                 {/* Message Input */}
                 <form onSubmit={handleSendMessage} className="flex gap-2">
                   <input
@@ -684,11 +778,11 @@ const ProjectDetail = () => {
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder="Type a message..."
                     className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={sendingMessage}
+                    disabled={sendingMessage || !connected}
                   />
                   <button
                     type="submit"
-                    disabled={sendingMessage || !newMessage.trim()}
+                    disabled={sendingMessage || !newMessage.trim() || !connected}
                     className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {sendingMessage ? (
@@ -701,6 +795,153 @@ const ProjectDetail = () => {
                     )}
                   </button>
                 </form>
+              </div>
+            )}
+
+            {/* Timesheets Tab Content */}
+            {activeTab === 'timesheets' && (
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold text-gray-900">Project Timesheets</h2>
+                  <select
+                    value={timesheetFilter}
+                    onChange={(e) => setTimesheetFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">All Timesheets</option>
+                    <option value="Submitted">Pending Approval</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </div>
+
+                {/* Timesheet Summary */}
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <p className="text-sm text-blue-600 font-medium">Total Hours</p>
+                    <p className="text-2xl font-bold text-blue-900">
+                      {projectTimesheets.reduce((sum, ts) => sum + parseFloat(ts.hours || 0), 0).toFixed(1)}h
+                    </p>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-4">
+                    <p className="text-sm text-green-600 font-medium">Billable Hours</p>
+                    <p className="text-2xl font-bold text-green-900">
+                      {projectTimesheets.filter(ts => ts.billable).reduce((sum, ts) => sum + parseFloat(ts.hours || 0), 0).toFixed(1)}h
+                    </p>
+                  </div>
+                  <div className="bg-yellow-50 rounded-lg p-4">
+                    <p className="text-sm text-yellow-600 font-medium">Pending Approval</p>
+                    <p className="text-2xl font-bold text-yellow-900">
+                      {projectTimesheets.filter(ts => ts.status === 'Submitted').length}
+                    </p>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg p-4">
+                    <p className="text-sm text-purple-600 font-medium">Approved</p>
+                    <p className="text-2xl font-bold text-purple-900">
+                      {projectTimesheets.filter(ts => ts.status === 'Approved').length}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Hours by Task Summary */}
+                <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                  <h3 className="font-semibold text-gray-900 mb-3">Hours by Task</h3>
+                  <div className="space-y-2">
+                    {tasks.map(task => {
+                      const taskHours = projectTimesheets
+                        .filter(ts => ts.taskId === task.id)
+                        .reduce((sum, ts) => sum + parseFloat(ts.hours || 0), 0);
+                      if (taskHours === 0) return null;
+                      return (
+                        <div key={task.id} className="flex justify-between items-center">
+                          <span className="text-sm text-gray-700">{task.name}</span>
+                          <span className="text-sm font-semibold text-gray-900">{taskHours.toFixed(1)}h</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Timesheets Table */}
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Team Member</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Task</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hours</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Billable</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {projectTimesheets
+                        .filter(ts => timesheetFilter === 'all' || ts.status === timesheetFilter)
+                        .map((timesheet) => (
+                        <tr key={timesheet.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {new Date(timesheet.date).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {timesheet.user?.name || 'N/A'}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <div className="font-medium text-gray-900">{timesheet.task?.name || 'N/A'}</div>
+                            {timesheet.description && (
+                              <div className="text-xs text-gray-500 truncate max-w-xs">{timesheet.description}</div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-gray-900">{timesheet.hours}h</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              timesheet.billable ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {timesheet.billable ? 'Yes' : 'No'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(timesheet.status)}`}>
+                              {timesheet.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {timesheet.status === 'Submitted' && (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleApproveTimesheet(timesheet.id)}
+                                  className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50"
+                                  title="Approve"
+                                >
+                                  <Check size={18} />
+                                </button>
+                                <button
+                                  onClick={() => handleRejectTimesheet(timesheet.id)}
+                                  className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
+                                  title="Reject"
+                                >
+                                  <XCircle size={18} />
+                                </button>
+                              </div>
+                            )}
+                            {timesheet.status !== 'Submitted' && (
+                              <span className="text-xs text-gray-400">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {projectTimesheets.filter(ts => timesheetFilter === 'all' || ts.status === timesheetFilter).length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      No timesheets found
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
