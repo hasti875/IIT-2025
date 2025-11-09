@@ -27,6 +27,7 @@ const Expenses = () => {
     billable: false
   });
   const [receiptFile, setReceiptFile] = useState(null);
+  const [customCategory, setCustomCategory] = useState('');
 
   useEffect(() => {
     fetchExpenses();
@@ -50,9 +51,11 @@ const Expenses = () => {
   const fetchActiveProjects = async () => {
     try {
       const response = await projectService.getAll();
-      // Filter only active projects
-      const activeProjects = (response.data || []).filter(p => p.status === 'Active');
-      setProjects(activeProjects);
+      // Filter active and completed projects
+      const availableProjects = (response.data || []).filter(p => 
+        p.status === 'Active' || p.status === 'Completed'
+      );
+      setProjects(availableProjects);
     } catch (error) {
       console.error('Error fetching projects:', error);
       setProjects([]);
@@ -89,9 +92,17 @@ const Expenses = () => {
         return;
       }
 
+      // If category is Other and no custom category entered, alert
+      if (newExpense.category === 'Other' && !customCategory.trim()) {
+        alert('Please enter a custom category');
+        return;
+      }
+
       // Create FormData for file upload
       const formData = new FormData();
-      formData.append('category', newExpense.category);
+      // Use custom category if "Other" is selected, otherwise use selected category
+      const finalCategory = newExpense.category === 'Other' ? customCategory : newExpense.category;
+      formData.append('category', finalCategory);
       formData.append('amount', parseFloat(newExpense.amount));
       formData.append('expenseDate', newExpense.expenseDate);
       formData.append('description', newExpense.description);
@@ -115,6 +126,7 @@ const Expenses = () => {
         billable: false
       });
       setReceiptFile(null);
+      setCustomCategory('');
       fetchExpenses();
       alert('Expense submitted successfully! Waiting for admin approval.');
     } catch (error) {
@@ -436,7 +448,12 @@ const Expenses = () => {
                 </label>
                 <select
                   value={newExpense.category}
-                  onChange={(e) => setNewExpense({...newExpense, category: e.target.value})}
+                  onChange={(e) => {
+                    setNewExpense({...newExpense, category: e.target.value});
+                    if (e.target.value !== 'Other') {
+                      setCustomCategory('');
+                    }
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select Category</option>
@@ -449,6 +466,22 @@ const Expenses = () => {
                   <option value="Other">Other</option>
                 </select>
               </div>
+
+              {/* Custom Category Input - shown when "Other" is selected */}
+              {newExpense.category === 'Other' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Custom Category *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter custom category name"
+                    value={customCategory}
+                    onChange={(e) => setCustomCategory(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -493,7 +526,7 @@ const Expenses = () => {
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">Only active projects are shown</p>
+                <p className="text-xs text-gray-500 mt-1">Active and completed projects are shown</p>
               </div>
 
               <div>

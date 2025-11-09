@@ -24,8 +24,7 @@ const Expense = sequelize.define('Expense', {
     onDelete: 'SET NULL'
   },
   category: {
-    type: DataTypes.ENUM('Salary', 'Equipment', 'Travel', 'Software', 'Marketing', 'Meals', 'Other'),
-    defaultValue: 'Other',
+    type: DataTypes.STRING,
     allowNull: false
   },
   amount: {
