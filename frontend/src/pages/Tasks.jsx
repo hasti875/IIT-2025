@@ -145,9 +145,6 @@ const Tasks = () => {
                   }`}>
                     {status} ({statusTasks.length})
                   </h3>
-                  <button className="text-gray-400 hover:text-gray-600 transition-colors text-xl font-bold">
-                    +
-                  </button>
                 </div>
 
                 {/* Task Cards Drop Zone */}
