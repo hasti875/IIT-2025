@@ -157,6 +157,19 @@ exports.deleteUser = async (req, res, next) => {
       });
     }
 
+    // Check if user is managing any projects
+    const { Project } = require('../models');
+    const managedProjects = await Project.count({
+      where: { managerId: user.id }
+    });
+
+    if (managedProjects > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete user. This user is managing ${managedProjects} project(s). Please reassign the projects first.`
+      });
+    }
+
     await user.destroy();
 
     res.status(200).json({

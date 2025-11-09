@@ -15,22 +15,34 @@ exports.getAllProjects = async (req, res) => {
 
     let projects;
 
-    // Team Members can only see projects where they have assigned tasks
+    // Team Members can only see projects where they are assigned as team members
     if (req.user && req.user.role === 'TeamMember') {
+      // Get projects where user is a team member
+      const userProjects = await ProjectTeam.findAll({
+        where: { userId: req.user.id },
+        attributes: ['projectId']
+      });
+
+      const projectIds = userProjects.map(pt => pt.projectId);
+
+      if (projectIds.length > 0) {
+        where.id = projectIds;
+      } else {
+        // If no projects assigned, return empty array
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          data: []
+        });
+      }
+
       projects = await Project.findAll({
         where,
         include: [
           { model: User, as: 'manager', attributes: ['id', 'name', 'email'] },
-          {
-            model: Task,
-            as: 'tasks',
-            where: { assignedTo: req.user.id },
-            required: true, // Only include projects that have tasks assigned to this user
-            attributes: ['id', 'status']
-          },
-          { model: User, as: 'teamMembers', attributes: ['id'], through: { attributes: [] } }
+          { model: Task, as: 'tasks', attributes: ['id', 'status'] },
+          { model: User, as: 'teamMembers', attributes: ['id', 'name', 'email'], through: { attributes: [] } }
         ],
-        distinct: true,
         order: [['createdAt', 'DESC']]
       });
     } else {
@@ -281,7 +293,7 @@ exports.deleteProject = async (req, res) => {
     // Check permissions:
     // - Admins can delete any project
     // - ProjectManagers can only delete their own projects
-    if (req.user.role === 'ProjectManager' && project.managerId !== req.user.id) {
+    if (req.user.role === 'ProjectManager' && project.managerId.toString() !== req.user.id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized. You can only delete projects you manage.'

@@ -51,10 +51,17 @@ const Expenses = () => {
   const fetchActiveProjects = async () => {
     try {
       const response = await projectService.getAll();
-      // Filter active and completed projects
-      const availableProjects = (response.data || []).filter(p => 
+      let availableProjects = (response.data || []).filter(p => 
         p.status === 'Active' || p.status === 'Completed'
       );
+
+      // For team members, only show projects where they are a team member
+      if (currentUser?.role === 'TeamMember') {
+        availableProjects = availableProjects.filter(project => 
+          project.teamMembers?.some(member => member.id === currentUser.id)
+        );
+      }
+
       setProjects(availableProjects);
     } catch (error) {
       console.error('Error fetching projects:', error);

@@ -1,4 +1,4 @@
-const { Expense, Project, User } = require('../models');
+const { Expense, Project, User, ProjectTeam } = require('../models');
 const PDFDocument = require('pdfkit');
 
 // Helper function to generate unique expense number
@@ -27,6 +27,29 @@ exports.getAllExpenses = async (req, res) => {
     if (projectId) where.projectId = projectId;
     if (category) where.category = category;
     if (status) where.status = status;
+
+    // If user is a TeamMember, filter expenses to show only from assigned projects
+    if (req.user.role === 'TeamMember') {
+      // Get all projects assigned to this team member
+      const assignedProjects = await ProjectTeam.findAll({
+        where: { userId: req.user.id },
+        attributes: ['projectId']
+      });
+
+      const projectIds = assignedProjects.map(pt => pt.projectId);
+
+      // Add projectId filter - only show expenses from assigned projects
+      if (projectIds.length > 0) {
+        where.projectId = projectIds;
+      } else {
+        // If team member has no assigned projects, return empty array
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          data: []
+        });
+      }
+    }
 
     const expenses = await Expense.findAll({
       where,

@@ -26,7 +26,8 @@ const Project = sequelize.define('Project', {
     references: {
       model: 'users',
       key: 'id'
-    }
+    },
+    onDelete: 'RESTRICT'
   },
   budget: {
     type: DataTypes.DECIMAL(15, 2),

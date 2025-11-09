@@ -9,13 +9,13 @@ const PurchaseOrder = sequelize.define('PurchaseOrder', {
   },
   projectId: {
     type: DataTypes.UUID,
-    allowNull: true,
+    allowNull: false,
     field: 'project_id',
     references: {
       model: 'projects',
       key: 'id'
     },
-    onDelete: 'SET NULL'
+    onDelete: 'CASCADE'
   },
   orderNumber: {
     type: DataTypes.STRING,
