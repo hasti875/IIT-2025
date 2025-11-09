@@ -17,9 +17,6 @@ const ProjectDetail = () => {
   const [users, setUsers] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [financialDocs, setFinancialDocs] = useState({
-    salesOrders: [],
-    purchaseOrders: [],
-    invoices: [],
     expenses: []
   });
   const [loading, setLoading] = useState(true);
@@ -142,17 +139,9 @@ const ProjectDetail = () => {
 
   const fetchFinancialDocs = async () => {
     try {
-      const [soRes, poRes, invRes, expRes] = await Promise.all([
-        financeService.getSalesOrders({ projectId: id }),
-        financeService.getPurchaseOrders({ projectId: id }),
-        financeService.getInvoices({ projectId: id }),
-        financeService.getExpenses({ projectId: id })
-      ]);
+      const expRes = await financeService.getExpenses({ projectId: id });
       
       setFinancialDocs({
-        salesOrders: soRes.data || [],
-        purchaseOrders: poRes.data || [],
-        invoices: invRes.data || [],
         expenses: expRes.data || []
       });
     } catch (error) {
@@ -467,50 +456,6 @@ const ProjectDetail = () => {
     { id: 'timesheets', label: 'Timesheets' },
     { id: 'chat', label: 'Chat' },
     { id: 'team', label: 'Team' }
-  ];
-
-  // Mock financial documents data
-  const financialDocuments = [
-    {
-      type: 'Sales Order',
-      id: 'SO-2024-001',
-      amount: '$45,000',
-      status: 'Confirmed',
-      statusColor: 'bg-green-500',
-      icon: FileText,
-      iconBg: 'bg-blue-100',
-      iconColor: 'text-blue-600'
-    },
-    {
-      type: 'Purchase Order',
-      id: 'PO-2024-005',
-      amount: '$12,500',
-      status: 'Sent',
-      statusColor: 'bg-blue-500',
-      icon: ShoppingCart,
-      iconBg: 'bg-blue-100',
-      iconColor: 'text-blue-600'
-    },
-    {
-      type: 'Invoice',
-      id: 'INV-2024-128',
-      amount: '$42,000',
-      status: 'Paid',
-      statusColor: 'bg-green-500',
-      icon: Receipt,
-      iconBg: 'bg-blue-100',
-      iconColor: 'text-blue-600'
-    },
-    {
-      type: 'Vendor Bill',
-      id: 'BILL-2024-089',
-      amount: '$10,200',
-      status: 'Paid',
-      statusColor: 'bg-green-500',
-      icon: CreditCard,
-      iconBg: 'bg-blue-100',
-      iconColor: 'text-blue-600'
-    }
   ];
 
   return (

@@ -15,9 +15,6 @@ import Tasks from './pages/Tasks';
 import MyTasks from './pages/MyTasks';
 import TaskCalendar from './pages/TaskCalendar';
 import Finance from './pages/Finance';
-import SalesOrders from './pages/SalesOrders';
-import PurchaseOrders from './pages/PurchaseOrders';
-import Invoices from './pages/Invoices';
 import Expenses from './pages/Expenses';
 import Timesheets from './pages/Timesheets';
 import Users from './pages/Users';
@@ -107,30 +104,6 @@ function App() {
             element={
               <ProtectedRoute>
                 <Finance />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/sales-orders"
-            element={
-              <ProtectedRoute>
-                <SalesOrders />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/purchase-orders"
-            element={
-              <ProtectedRoute>
-                <PurchaseOrders />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/invoices"
-            element={
-              <ProtectedRoute>
-                <Invoices />
               </ProtectedRoute>
             }
           />

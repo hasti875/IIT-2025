@@ -1,18 +1,16 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShoppingCart, FileText, Receipt, DollarSign } from 'lucide-react';
+import { DollarSign, Clock } from 'lucide-react';
 
 const FinanceLayout = ({ children }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Only 4 navigation items for Finance/Sales role
+  // Finance/Sales role navigation items
   const navigation = [
-    { name: 'Sales Orders', href: '/sales-orders', icon: ShoppingCart },
-    { name: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
-    { name: 'Invoices', href: '/invoices', icon: FileText },
     { name: 'Expenses', href: '/expenses', icon: DollarSign },
+    { name: 'Timesheets', href: '/timesheets', icon: Clock },
   ];
 
   const handleLogout = () => {
