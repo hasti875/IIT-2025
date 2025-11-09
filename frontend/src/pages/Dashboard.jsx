@@ -3,8 +3,10 @@ import { dashboardService, projectService } from '../services';
 import { FolderKanban, CheckSquare, Clock, TrendingUp, Loader2, Users, DollarSign, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { useCurrency } from '../context/CurrencyContext';
 
 const Dashboard = () => {
+  const { formatAmount } = useCurrency();
   const [analytics, setAnalytics] = useState(null);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -81,8 +83,8 @@ const Dashboard = () => {
     },
     {
       title: 'Revenue',
-      value: `$${summary.totalRevenue?.toLocaleString() || '0'}`,
-      subtitle: `$${summary.totalProfit?.toLocaleString() || '0'} profit`,
+      value: formatAmount(0),
+      subtitle: `${formatAmount(0)} profit`,
       icon: TrendingUp,
       bgColor: 'bg-orange-50',
       iconColor: 'text-orange-500'
