@@ -1256,7 +1256,10 @@ const ProjectDetail = () => {
                 >
                   <option value="">-- Choose a user --</option>
                   {users
-                    .filter(user => !teamMembers.some(member => member.id === user.id))
+                    .filter(user => 
+                      !teamMembers.some(member => member.id === user.id) && 
+                      user.id !== currentUser?.id
+                    )
                     .map((user) => (
                       <option key={user.id} value={user.id}>
                         {user.name} ({user.email}) - {user.role === 'ProjectManager' ? 'Project Manager' : 'Team Member'}
