@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import RoleBasedLayout from '../components/RoleBasedLayout';
 import { Users as UsersIcon, Plus, Search, Edit2, Trash2, UserCheck, UserX } from 'lucide-react';
-import { userService } from '../services';
+import { userService, authService } from '../services';
 import { useCurrency } from '../context/CurrencyContext';
 
 export default function Users() {
   const { currencySymbol } = useCurrency();
+  const currentUser = authService.getCurrentUser();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -198,22 +199,39 @@ export default function Users() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => toggleUserStatus(user)}
-                          className={`${user.isActive ? 'text-orange-600 hover:text-orange-900' : 'text-green-600 hover:text-green-900'}`}
-                          title={user.isActive ? 'Deactivate' : 'Activate'}
+                          disabled={currentUser?.id === user.id}
+                          className={`${
+                            currentUser?.id === user.id 
+                              ? 'text-gray-300 cursor-not-allowed' 
+                              : user.isActive 
+                                ? 'text-orange-600 hover:text-orange-900' 
+                                : 'text-green-600 hover:text-green-900'
+                          }`}
+                          title={currentUser?.id === user.id ? 'Cannot deactivate yourself' : (user.isActive ? 'Deactivate' : 'Activate')}
                         >
                           {user.isActive ? <UserX size={18} /> : <UserCheck size={18} />}
                         </button>
                         <button
                           onClick={() => openEditModal(user)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Edit"
+                          disabled={currentUser?.id === user.id}
+                          className={`${
+                            currentUser?.id === user.id 
+                              ? 'text-gray-300 cursor-not-allowed' 
+                              : 'text-blue-600 hover:text-blue-900'
+                          }`}
+                          title={currentUser?.id === user.id ? 'Cannot edit yourself' : 'Edit'}
                         >
                           <Edit2 size={18} />
                         </button>
                         <button
                           onClick={() => handleDelete(user.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Delete"
+                          disabled={currentUser?.id === user.id}
+                          className={`${
+                            currentUser?.id === user.id 
+                              ? 'text-gray-300 cursor-not-allowed' 
+                              : 'text-red-600 hover:text-red-900'
+                          }`}
+                          title={currentUser?.id === user.id ? 'Cannot delete yourself' : 'Delete'}
                         >
                           <Trash2 size={18} />
                         </button>
